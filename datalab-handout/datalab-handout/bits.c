@@ -163,10 +163,7 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  if((x ^ (~0x00000000)) < 0 && ((x + 0x01) < 0)){
-    return 1;
-  }
-  return 0;
+    return (!(~(x^(x+1)))) & (!(!(x^(~0x00000000))));
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
