@@ -174,7 +174,7 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  return !(~(x | 0x55 | (0x55 << 8) | (0x55 << 16) | (0x55 << 24)));
 }
 /* 
  * negate - return -x 
@@ -184,7 +184,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return (~x) + 0x01;;
 }
 //3
 /* 
@@ -197,7 +197,7 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  return !(x + (~(0x30) + 0x01) & (0x01 << 31)) & ((x + (~(0x3a) + 0x01) & (0x01 << 31)) >> 31);
 }
 /* 
  * conditional - same as x ? y : z 
@@ -207,7 +207,7 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  return (((!x) + (~0x00)) & y) | (((~(!x) + 0x01) & z));
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -217,7 +217,7 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  return !((0x01 << 31) ^ x) | (!(((y + (~x + 0x01))) >> 31)) | (!(x ^ y));
 }
 //4
 /* 
