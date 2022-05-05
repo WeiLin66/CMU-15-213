@@ -323,14 +323,15 @@ int floatFloat2Int(unsigned uf) {
   int flag = (uf >> 31) & 0x01;
   int exp = ((uf >> 23) & 0xff);
   int frac = uf & 0x7fffff;
+  int n = exp - 127;
 
   // 0
   if(exp == 0 && frac == 0){
-    return uf;
+    return 0;
   }
 
   // infinite or NaN
-  if(exp == 0xff){
+  if(n >= 32){
     return 0x80000000u;
   }
 
@@ -339,12 +340,22 @@ int floatFloat2Int(unsigned uf) {
     return 0;
   }
 
-  /**
-   * normalize
-   * 
-   */
+  // normalize
+  float base = 1.0;
+  
+  flag = (flag == 0x01) ? -1 : 1;
 
-  return 2;
+  if((frac >> 22) & 0x01 == 0x01){
+    base += 0.5;
+  }
+
+  if(n > 0){
+    return (int)(flag * base * (1 << n));
+  }else if(n == 0){
+      return (int) flag * base;
+  }else{
+    return (int)(flag * base * (1 >> (-n)));
+  }
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
