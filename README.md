@@ -9,11 +9,14 @@
 
 ## 如何使用
 
-1. Labs資料夾: 存放個章節末的實驗解答
-2. Labs_Backup: 初始的Lab
-3. homeworks資料夾: 包含個章節的回家作業解答
-4. resources: 上課講義與教科書
-5. *essay: 規劃中，未來有文章講解會放在這裡，方便理解
+
+| 資料夾      | 內容                                       |
+| ------------- | -------------------------------------------- |
+| Labs        | 章節末的實驗解答                           |
+| Labs_Backup | 初始的Lab                                  |
+| homeworks   | 包含各個章節的回家作業解答                 |
+| resources   | 上課講義與教科書                           |
+| *essay      | 規劃中，未來有文章講解會放在這裡，方便理解 |
 
 ## log
 
@@ -42,7 +45,7 @@
 
 ## 實驗環境搭建
 
-| *建議使用Ubuntu作業系統或其他Linux distros*
+| 🚀️ *建議使用Ubuntu作業系統或其他Linux distros*
 
 1. 首先從Github拉取該repo
 2. 複製Lab_Backup中的Lab檔
