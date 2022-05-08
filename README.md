@@ -42,7 +42,7 @@
 
 ## 實驗環境搭建
 
-| 建議使用Ubuntu作業系統或其他Linux distros
+| *建議使用Ubuntu作業系統或其他Linux distros*
 
 1. 首先從Github拉取該repo
 2. 複製Lab_Backup中的Lab檔
@@ -65,9 +65,8 @@ make
 5. 完成後每次編譯只需要在終端中輸入`./run.sh即可`
 6. `./dlc -e bits.c`查看執行operator的次數
 
-
 ## 聯絡我
 
 email: linhoway@gmail.com
 
-[更多資源](https://www.notion.so/65c369764450416f84fd469bd2a718fb)
+[更多資源](https://equinox-mahogany-b74.notion.site/CMU-15-213-Intro-to-Computer-Systems-c0d76b0ec3f840ff8f5c46113a9b43c3)
