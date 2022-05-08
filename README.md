@@ -51,7 +51,7 @@
    2. 安裝make: `sudo apt -y install make`(已安裝請跳過)
 4. 編寫腳本(可選)
 
-! 使用腳本的目的是為了省略`make`, `make` `clean`, `./btest`
+⚠️使用腳本的目的是為了省略`make`, `make` `clean`, `./btest`
 
 開啟lab並在資料夾中建立`run.sh，`，並將下列程式碼複製到文件中
 
