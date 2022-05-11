@@ -92,17 +92,38 @@ unsigned replace_byte(unsigned x, int i, unsigned char b){
  */
 
 /**
- * @brief 
- * 
+ * @brief hw 2.61
+ * 返回1，當x任何位都是1或都是0時，最高有效byte為0；最低有效byte為1
  * @param x 
  * @return int 
  */
 int conditional_one_zero(unsigned x){
+    if((x ^ (~0x0)) == 0x0 || (x & (~0x0)) == 0x0){
+        return 1;
+    }else if(((x & 0xff) == 0xff) || (((x >> 24) & 0xff) == 0x0)){
+        return 1;
+    }else{
+        return 0;
+    }
+}
 
+/**
+ * @brief hw 2.62
+ * 判斷該機器對int類型整數式使用邏輯右移還是算術左移
+ * @return int 
+ */
+int int_shifts_are_arithmetic(){
+    int t = -1;
+    int s = (t >> 31) & 0x01;
+    if((((t >> 1) >> 31) & 0x01) == s){
+        return 1;
+    }else{
+        return 0;
+    }
 }
 
 int main(){
-    printf("0x%X\n", replace_byte(0x12345678, , 0xAB));
+    printf("0x%X\n", int_shifts_are_arithmetic());
 
     return 0;
 }

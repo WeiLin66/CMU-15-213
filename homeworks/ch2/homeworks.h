@@ -1,4 +1,4 @@
-ifndef __HOMEWORKS_H_
+#ifndef __HOMEWORKS_H_
 #define __HOMEWORKS_H_
 
 #include <stdio.h>
@@ -15,4 +15,4 @@ typedef uint64_t*       u64_pointer;
 typedef float*          f_pointer;
 typedef double*         d_pointer;
 
-#endif __HOMEWORKS_H_ /* __HOMEWORKS_H_ */
+#endif /* __HOMEWORKS_H_ */

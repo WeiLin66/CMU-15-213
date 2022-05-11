@@ -70,6 +70,6 @@ make
 
 ## 聯絡我
 
-email: linhoway@gmail.com
+📌email: linhoway@gmail.com
 
-[更多資源](https://equinox-mahogany-b74.notion.site/CMU-15-213-Intro-to-Computer-Systems-c0d76b0ec3f840ff8f5c46113a9b43c3)
+📌[更多資源](https://equinox-mahogany-b74.notion.site/CMU-15-213-Intro-to-Computer-Systems-c0d76b0ec3f840ff8f5c46113a9b43c3)
