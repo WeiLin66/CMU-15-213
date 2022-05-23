@@ -122,8 +122,89 @@ int int_shifts_are_arithmetic(){
     }
 }
 
+/**
+ * @brief hw 2.63
+ * 補足函式程式碼完成邏輯與算術右移需求
+ */
+unsigned srl(unsigned x, int k){
+    /* Perform shift arithmetically */
+    unsigned xsra = (int) x >> k;
+
+    for(int i=0; i<k; i++){
+        xsra &= ~(0x01 << (31-i));
+    }
+
+    return xsra;
+}
+
+int sra(int x, int k){
+    /* Perform shift logically */
+    int xsrl = (unsigned)x >> k;
+    int shift = (xsrl >> (31-k)) & 0x01;
+
+    for(int i=0; i<k; i++){
+        xsrl |= (shift << (31-i));
+    }
+
+    return xsrl;
+}
+
+/**
+ * @brief hw 2.64
+ * 判斷x的任何基數位為1則返回1，反之則返回0
+ * @param x 
+ * @return int 
+ */
+int any_odd_one(unsigned x){
+    if(x == 0){
+        return 0;
+    }
+
+    for(int i=0; i<3; i++){
+        if(((x & 0xff) & 0x55) != 0){
+            return 1;
+        }
+        x >>= 8;
+    }
+    return 0;
+}
+
+/**
+ * @brief hw 2.65
+ * 判斷x是否含有基數個1
+ * 只能使用算術運算、邏輯運算、位運算
+ * 限定只能使用12個運算符
+ * @param x 
+ * @return int 
+ */
+int odd_ones(unsigned x){
+    unsigned b16 = (x >> 16) ^ x;
+    unsigned b8 = (b16 >> 8) ^ b16;
+    unsigned b4 = (b8 >> 4) ^ b8;
+    unsigned b2 = (b4 >> 2) ^ b4;
+
+    return ((b2 >> 1) ^ b2) & 0x01; 
+}
+
+/**
+ * @brief hw 2.66
+ * 求表示x的最大比特位mask
+ * @param x 
+ * @return int 
+ */
+int leftmost_one(unsigned x) {
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+
+    return (x >> 1) + 0x1;
+}
+
 int main(){
-    printf("0x%X\n", int_shifts_are_arithmetic());
+    unsigned test = 0x7f000001;
+    printf("0x%X\n", leftmost_one(test));
 
     return 0;
 }
