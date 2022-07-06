@@ -181,5 +181,11 @@
 `strings_not_equal`函式主要包含
 
 1. `string_length`函式，用來逐一檢查字元，判斷字串長度
-   - 該參數有兩個參數，一個是輸入參數，一個是解答字串，分別為`%rdi %rsi`，這個解碼字串儲存位置位於`0x402400`
-   - 因此`string_length`會調用兩次來判斷雙方字串長度，這兩個結果分別被存放到`%r12 %eax`暫存器中
+2. `strings_not_equal`後續就是逐一對字元進行比對，若不同則返回`false`，直到`\0`為止
+3. 可以發現`strings_not_equal`具有兩個參數，一個是輸入參數，一個是解答字串，分別為`%rdi %rsi`，這個解碼字串儲存位置位於`0x402400`
+4. 因此在GDB中直接打印該地址就可以查看該字串`x/s 0x402400`，輸出結果為`Border relations with Canada have never been better.`
+
+
+
+### Phase 2
+
