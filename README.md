@@ -2,12 +2,7 @@
 
 ## 關於
 
-這個repo是我自學CSAPP的一個紀錄，內容包括個章節的homeworks解答, Lab解答, 上課講義, 內容來自官方:
-
-- [CMU student site](http://csapp.cs.cmu.edu/3e/home.htmlhttp://csapp.cs.cmu.edu/3e/labs.htmlhttps:)
-- [CMU官方網站](http://www.cs.cmu.edu/afs/cs/academic/class/15213-f15/www/index.htmlhttps:/)
-
-## 如何使用
+這個repo是我自學CSAPP的一個紀錄，內容包括個章節的homeworks解答, Lab解答, 上課講義。
 
 
 | 資料夾      | 內容                                       |
@@ -24,7 +19,7 @@
 * [X] labs
 
   * [X] [*Data Lab*](http://csapp.cs.cmu.edu/im/labs/datalab.tar)
-  * [ ] [*Bomb Lab*](http://csapp.cs.cmu.edu/im/labs/bomblab.tar)
+  * [x] [*Bomb Lab*](http://csapp.cs.cmu.edu/im/labs/bomblab.tar)
   * [ ] [*Attack Lab*](http://csapp.cs.cmu.edu/im/labs/attacklab.tar)
   * [ ] [*Cache Lab*](http://csapp.cs.cmu.edu/im/labs/cachelab.tar)
   * [ ] [*Shell Lab*](http://csapp.cs.cmu.edu/im/labs/shlab.tar)
@@ -32,7 +27,7 @@
   * [ ] [*Proxy Lab*](http://csapp.cs.cmu.edu/im/labs/proxylab.tar)
 * [ ] homeworks
 
-  * [ ] ch2(進行中...)
+  * [x] ch2(進行中...)
   * [ ] ch3
   * [ ] ch5
   * [ ] ch6
