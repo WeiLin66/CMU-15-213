@@ -67,7 +67,30 @@
 
       - 已16進制打印i
 
-    - `p i + 3`
+  - `p i + 3`
+
+- `x addr`
+
+    - 記憶體檢查
+    - `x/nfu addr`
+        - n, f, u為可選參數
+        - n表示欲顯示記憶體數量，顯示的記憶體單元長度由u決定，若n為負數，則從addr向後計數
+        - f為顯示格式
+            - o - octal
+            - x - hexadecimal
+            - d - decimal
+            - u - unsigned decimal
+            - t - binary
+            - f - floating point
+            - a - address
+            - c - char
+            - s - string
+            - i - instruction
+        - u為記憶體單元長度
+            - b - Bytes
+            - h - Halfwords (2 Bytes)
+            - w - Words (4 Bytes)
+            - g - Giant words (8 Bytes)
 
 - set var 變數＝特定值
 
