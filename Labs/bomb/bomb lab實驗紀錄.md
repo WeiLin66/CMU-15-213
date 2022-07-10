@@ -435,17 +435,17 @@ return res == p2; // 參數2的值必須要符合res的對應值
 
 ```c
 unsigned func4(unsigned input, unsigned* rdx, unsigned* rsi){
-    unsigned rax = ((rdx-rsi) + ((rdx-rsi) >> 31)) / 2;
-    unsigned rcx = rax + rsi;
+    unsigned rax = ((*rdx - *rsi) + ((*rdx - *rsi) >> 31)) / 2;
+    unsigned rcx = rax + *rsi;
     
     if(rcx < input){
         *rsi = rcx + 1;
         func4(input, rdx, rsi);
-        return 2*a + 1;
+        return 2*rax + 1;
     }else if(rcx > input){
         *rdx = rcx - 1;
         func4(input, rdx, rsi);
-        return 2*a;
+        return 2*rax;
     }else{
         return 0;
     }
