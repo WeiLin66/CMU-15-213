@@ -438,18 +438,16 @@ void func4(unsigned input, unsigned* rdx, unsigned* rsi){
     unsigned rax = ((rdx-rsi) + ((rdx-rsi) >> 31)) / 2;
     unsigned rcx = rax + rsi;
     
-    if(rcx <= input){
-        if(rcx == input){
-            return 0;
-        }else{
-            *rsi = rcx + 1;
-            func4(input, rdx, rsi);
-            return 2*a + 1;
-        }
-    }else{
+    if(rcx < input){
+        *rsi = rcx + 1;
+        func4(input, rdx, rsi);
+        return 2*a + 1;
+    }else if(rcx > input){
         *rdx = rcx - 1;
         func4(input, rdx, rsi);
         return 2*a;
+    }else{
+        return 0;
     }
 }
 ```
