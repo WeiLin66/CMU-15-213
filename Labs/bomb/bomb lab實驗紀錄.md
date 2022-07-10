@@ -434,7 +434,7 @@ return res == p2; // 參數2的值必須要符合res的對應值
 3. `func4`為一個遞迴函式，它會將使用者的輸入參數與`%rdx`與`%rsi`的計算結果進行比較，從而不斷自我調用，將其邏輯轉換成C：
 
 ```c
-void func4(unsigned input, unsigned* rdx, unsigned* rsi){
+unsigned func4(unsigned input, unsigned* rdx, unsigned* rsi){
     unsigned rax = ((rdx-rsi) + ((rdx-rsi) >> 31)) / 2;
     unsigned rcx = rax + rsi;
     
