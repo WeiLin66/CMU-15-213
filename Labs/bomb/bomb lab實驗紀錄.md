@@ -398,3 +398,64 @@ return res == p2; // 參數2的值必須要符合res的對應值
    0x0000000000401061 <+85>:	retq 
 ```
 
+#### `func4`
+
+```asm
+   0x0000000000400fce <+0>:	sub    $0x8,%rsp
+   0x0000000000400fd2 <+4>:	mov    %edx,%eax
+   0x0000000000400fd4 <+6>:	sub    %esi,%eax
+   0x0000000000400fd6 <+8>:	mov    %eax,%ecx
+   0x0000000000400fd8 <+10>:	shr    $0x1f,%ecx
+   0x0000000000400fdb <+13>:	add    %ecx,%eax
+   0x0000000000400fdd <+15>:	sar    %eax
+   0x0000000000400fdf <+17>:	lea    (%rax,%rsi,1),%ecx
+   0x0000000000400fe2 <+20>:	cmp    %edi,%ecx
+   0x0000000000400fe4 <+22>:	jle    0x400ff2 <func4+36>
+   0x0000000000400fe6 <+24>:	lea    -0x1(%rcx),%edx
+   0x0000000000400fe9 <+27>:	callq  0x400fce <func4>
+   0x0000000000400fee <+32>:	add    %eax,%eax
+   0x0000000000400ff0 <+34>:	jmp    0x401007 <func4+57>
+   0x0000000000400ff2 <+36>:	mov    $0x0,%eax
+   0x0000000000400ff7 <+41>:	cmp    %edi,%ecx
+   0x0000000000400ff9 <+43>:	jge    0x401007 <func4+57>
+   0x0000000000400ffb <+45>:	lea    0x1(%rcx),%esi
+   0x0000000000400ffe <+48>:	callq  0x400fce <func4>
+   0x0000000000401003 <+53>:	lea    0x1(%rax,%rax,1),%eax
+   0x0000000000401007 <+57>:	add    $0x8,%rsp
+   0x000000000040100b <+61>:	retq  
+```
+
+
+
+炸彈2需要使用者輸入2個參數，第一個參數的關鍵在於整個程式流程在於`func4`函式，這是一個遞迴函式。第二個參數相對簡單，只要輸入0就可以通過，所以我們著重分析參數1的判斷
+
+1. 首先先界定範圍`cmpl   $0xe,0x8(%rsp)`這條語句表示輸入參數須小於等於`0xe`(14)否則引爆炸彈
+2. 完成第一步後，將`%edx`設為`0xe`，將`%esi`設為`0x0`後進入`func4`
+3. `func4`為一個遞迴函式，它會將使用者的輸入參數與`%rdx`與`%rsi`的計算結果進行比較，從而不斷自我調用，將其邏輯轉換成C：
+
+```c
+void func4(unsigned input, unsigned* rdx, unsigned* rsi){
+    unsigned rax = ((rdx-rsi) + ((rdx-rsi) >> 31)) / 2;
+    unsigned rcx = rax + rsi;
+    
+    if(rcx <= input){
+        if(rcx == input){
+            return 0;
+        }else{
+            *rsi = rcx + 1;
+            func4(input, rdx, rsi);
+            return 2*a + 1;
+        }
+    }else{
+        *rdx = rcx - 1;
+        func4(input, rdx, rsi);
+        return 2*a;
+    }
+}
+```
+
+4. 其實我們從`phase_4`函式中可以發現，當`%rax`等於0時炸彈就不會引爆，所以我們在解這題時要把注意力放在如何使`%rax`等於0。
+5. 由於初始調用的`%rdx`與`%rsi`分別為14以及0，所以我們只需要使輸入`input`等於`rcx`就可以了，由這個計算結果可以得到第一個解`7 0`
+6. 當`rcx`的值小於或大於`input`時就會進入遞迴環節，從上面的C代碼可以看出，無論如何我們都不希望`rcx`小於`input`，因為不管`rax`為何，返回值始終不為0。因此在撇除`rcx`與`input`相等的狀況下(7)，剩餘的選項就是0~6
+7. 所以我們希望遞迴到底都是從`rcx > imput`這個代碼區塊出發，也就是說每次都調用`func4(input, rcx-1, rsi)`。而經過每次調用其`rcx`分別會是`3,1,0`
+8. 經果整個邏輯推敲參數1的可能值分別為`0, 1, 3, 7`
