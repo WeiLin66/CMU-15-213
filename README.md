@@ -19,13 +19,13 @@
 
 * [X] labs
 
-  * [X] [*Data Lab*](http://csapp.cs.cmu.edu/im/labs/datalab.tar)
-  * [x] [*Bomb Lab*](http://csapp.cs.cmu.edu/im/labs/bomblab.tar)
-  * [ ] [*Attack Lab*](http://csapp.cs.cmu.edu/im/labs/attacklab.tar)
-  * [ ] [*Cache Lab*](http://csapp.cs.cmu.edu/im/labs/cachelab.tar)
-  * [ ] [*Shell Lab*](http://csapp.cs.cmu.edu/im/labs/shlab.tar)
-  * [ ] [*Malloc Lab*](http://csapp.cs.cmu.edu/im/labs/malloclab.tar)
-  * [ ] [*Proxy Lab*](http://csapp.cs.cmu.edu/im/labs/proxylab.tar)
+  * [X] **Data Lab**
+  * [x] **Bomb Lab**
+  * [ ] **Attack Lab**
+  * [ ] **Cache Lab**
+  * [ ] **Shell Lab**
+  * [ ] **Malloc Lab**
+  * [ ] **Proxy Lab**
   
 * [ ] homeworks
 
