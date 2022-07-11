@@ -589,9 +589,155 @@ unsigned func4(unsigned input, unsigned* rdx, unsigned* rsi){
 
 ```
 
-1. 輸入參數為6
-2. `cmp    $0x5,%eax`輸入參數減1要小於6
-3. tbd
+先著重思考這個程式的作用是什麼
+
+1. 輸入參數為6個
+
+2. `0x603910`為輸入字串地址
+
+3. `%r12`的含意
+
+   - 初始為`0x0`
+   - 循環變數，等於6就跳轉
+   - 接著循環的工作就由`%rbx`接手
+
+4. `%r13`一開始存放`%rsp`
+
+5. 逐一取參數，`cmp    $0x5,%eax`輸入參數減1要小於6
+
+6. `mov    (%rsp,%rax,4),%eax`將存放在棧上的局部變數取出(下一個)，並且與當前元素比較
+
+   - arr[1] <---> arr[1]
+   - 每個元素都不能相同
+   - 重點觀察`%rbp`變化
+
+7. 每次循環都跟後續元素比較是否相等，第一個元素做完後，換下一個元素直到全部元素確認都不相同為止
+
+8. `lea    0x18(%rsp),%rsi`pop掉空間
+
+9. `%rax`存放局部變數地址
+
+10. `%rcx`存放`0x7`
+
+11. 將每個元素改成`0x7`減去它自己 &rarr;`0x7fffffffdeb0`開始地址
+
+    - `1 2 3 4 5 6` &rarr; `6 5 4 3 2 1`
+
+12. `mov    $0x0,%esi`
+
+13. `mov    (%rsp,%rsi,1),%ecx `逐一取出元素，跟1比較(依照計算出的元素值取出對應的節點地址，上述例子就是`6 5 4 3 2 1`)
+
+    - 比1大
+
+      - `%eax`代表節點數，總共有6個節點
+      - `mov    $0x6032d0,%edx` &larr;節點(node1)
+      - `mov    0x8(%rdx),%rdx` &larr;節點(node n)
+      - 不斷的遍歷節點
+
+      ```c
+      typedef struct{
+          int val;
+          struct node* next;
+      }node;
+      ```
+
+      - 將節點的地址存放到棧上`mov    %rdx,0x20(%rsp,%rsi,2)`
+      - 每次取從當前node算起的第n個node，n取決於上面計算的數值
+      - `node1 --> node2 --> node3 --> node4 --> node5 --> node6 --> null`
+
+      ```asm
+      0x7fffffffded0: 6304544 6304528
+      0x7fffffffdee0: 6304512 6304496
+      0x7fffffffdef0: 6304480 6304464
+      ```
+
+      
+
+14. 將`linkedlist`的head存放到`%rcx`
+
+    - head的next的存放到`%rdx`
+    - `node.next = node_n`
+    - 結尾`node_n.next = null`
+
+15. `mov    (%rax),%eax`取下一個節點(x/uw 地址)
+
+    - `node6.val = 433`
+    - `node5.val = 477`
+    - `node4.val = 691`
+    - `node3.val = 924`
+    - `node2.val = 168`
+    - `node1.val = 332`
+
+16. 每次遍歷節點的值都要大於等於next的值
+
+    - 因此排列後結果為`4 3 2 1 6 5`
+
+
+
+### Secret Phase
+
+```c
+    /* Wow, they got it!  But isn't something... missing?  Perhaps
+     * something they overlooked?  Mua ha ha ha ha! */
+```
+
+隱層彩蛋躲在`phase_defused()`中
+
+```asm
+   0x0000000000401242 <+0>:	push   %rbx
+   0x0000000000401243 <+1>:	callq  0x40149e <read_line>
+   0x0000000000401248 <+6>:	mov    $0xa,%edx
+   0x000000000040124d <+11>:	mov    $0x0,%esi
+   0x0000000000401252 <+16>:	mov    %rax,%rdi
+   0x0000000000401255 <+19>:	callq  0x400bd0 <strtol@plt>
+   0x000000000040125a <+24>:	mov    %rax,%rbx
+   0x000000000040125d <+27>:	lea    -0x1(%rax),%eax
+   0x0000000000401260 <+30>:	cmp    $0x3e8,%eax
+   0x0000000000401265 <+35>:	jbe    0x40126c <secret_phase+42>
+   0x0000000000401267 <+37>:	callq  0x40143a <explode_bomb>
+   0x000000000040126c <+42>:	mov    %ebx,%esi
+   0x000000000040126e <+44>:	mov    $0x6030f0,%edi
+   0x0000000000401273 <+49>:	callq  0x401204 <fun7>
+   0x0000000000401278 <+54>:	cmp    $0x2,%eax
+   0x000000000040127b <+57>:	je     0x401282 <secret_phase+64>
+   0x000000000040127d <+59>:	callq  0x40143a <explode_bomb>
+   0x0000000000401282 <+64>:	mov    $0x402438,%edi
+   0x0000000000401287 <+69>:	callq  0x400b10 <puts@plt>
+   0x000000000040128c <+74>:	callq  0x4015c4 <phase_defused>
+   0x0000000000401291 <+79>:	pop    %rbx
+   0x0000000000401292 <+80>:	retq  
+```
+
+#### func7
+
+```asm
+   0x0000000000401204 <+0>:	sub    $0x8,%rsp
+   0x0000000000401208 <+4>:	test   %rdi,%rdi
+   0x000000000040120b <+7>:	je     0x401238 <fun7+52>
+   0x000000000040120d <+9>:	mov    (%rdi),%edx
+   0x000000000040120f <+11>:	cmp    %esi,%edx
+   0x0000000000401211 <+13>:	jle    0x401220 <fun7+28>
+   0x0000000000401213 <+15>:	mov    0x8(%rdi),%rdi
+   0x0000000000401217 <+19>:	callq  0x401204 <fun7>
+   0x000000000040121c <+24>:	add    %eax,%eax
+   0x000000000040121e <+26>:	jmp    0x40123d <fun7+57>
+   0x0000000000401220 <+28>:	mov    $0x0,%eax
+   0x0000000000401225 <+33>:	cmp    %esi,%edx
+   0x0000000000401227 <+35>:	je     0x40123d <fun7+57>
+   0x0000000000401229 <+37>:	mov    0x10(%rdi),%rdi
+   0x000000000040122d <+41>:	callq  0x401204 <fun7>
+   0x0000000000401232 <+46>:	lea    0x1(%rax,%rax,1),%eax
+   0x0000000000401236 <+50>:	jmp    0x40123d <fun7+57>
+   0x0000000000401238 <+52>:	mov    $0xffffffff,%eax
+   0x000000000040123d <+57>:	add    $0x8,%rsp
+   0x0000000000401241 <+61>:	retq  
+```
+
+
+
+
+
+
 
 
 
