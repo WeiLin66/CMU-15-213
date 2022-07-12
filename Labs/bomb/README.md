@@ -589,99 +589,124 @@ unsigned func4(unsigned input, unsigned* rdx, unsigned* rsi){
 
 ```
 
-先著重思考這個程式的作用是什麼
+`phase_6`其實是一個不斷將節點連接成**鏈狀表**的程式
 
-1. 輸入參數為6個
+1. 首先從輸入可以得知參數數量為6，由`sub    $0x1,%eax`與`cmp    $0x5,%eax`得知參數範圍需要小於等於6
+2. 逐一檢查輸入參數，每個參數必須是獨一無二的
+3. 接著用7去循環減去輸入的參數，若當初輸入為`1 2 3 4 5 6`則結果會是`6 5 4 3 2 1`
+4. 上述的運算結果將會被當成偏移量不斷的動記憶體位置，其實這步就是在遍歷整個鏈狀表。每次取從當前node算起的第n個node，n取決於上面計算的數值
 
-2. `0x603910`為輸入字串地址
+```c
+typedef struct{
+    int val;
+    struct node* next;
+}node;
+```
 
-3. `%r12`的含意
+5. 從上面的結構體可以推測出節點變數的記憶體位置，因此`mov    0x8(%rdx),%rdx`這部其實就是取next並指向存放在棧上的數據(各節點地址)，所以`%rbx`就是存放節點的地址，透過`x/uw可以查看val大小`
 
-   - 初始為`0x0`
-   - 循環變數，等於6就跳轉
-   - 接著循環的工作就由`%rbx`接手
+   - 每個節點對應的`val`
 
-4. `%r13`一開始存放`%rsp`
+     - `node6.val = 433`
 
-5. 逐一取參數，`cmp    $0x5,%eax`輸入參數減1要小於6
+     - `node5.val = 477`
 
-6. `mov    (%rsp,%rax,4),%eax`將存放在棧上的局部變數取出(下一個)，並且與當前元素比較
+     - `node4.val = 691`
 
-   - arr[1] <---> arr[1]
-   - 每個元素都不能相同
-   - 重點觀察`%rbp`變化
+     - `node3.val = 924`
 
-7. 每次循環都跟後續元素比較是否相等，第一個元素做完後，換下一個元素直到全部元素確認都不相同為止
+     - `node2.val = 168`
 
-8. `lea    0x18(%rsp),%rsi`pop掉空間
+     - `node1.val = 332`
 
-9. `%rax`存放局部變數地址
+6. 組合完成的鏈狀表的`val`值都要大於等於next的`val`值
 
-10. `%rcx`存放`0x7`
+7. 依照順序將每個節點串起來，因此排列後結果為`node3 --> node4 --> node5 --> node6 --> node1 --> node2 --> null`，所以反推輸入應當為`4 3 2 1 6 5`
 
-11. 將每個元素改成`0x7`減去它自己 &rarr;`0x7fffffffdeb0`開始地址
+```c
+typedef int[6] six_arr;
 
-    - `1 2 3 4 5 6` &rarr; `6 5 4 3 2 1`
+Node node[6] = ({332,NULL},{168,NULL},
+                {924,NULL},{691,NULL},
+				{477,NULL},{433,NULL}};
 
-12. `mov    $0x0,%esi`
-
-13. `mov    (%rsp,%rsi,1),%ecx `逐一取出元素，跟1比較(依照計算出的元素值取出對應的節點地址，上述例子就是`6 5 4 3 2 1`)
-
-    - 比1大
-
-      - `%eax`代表節點數，總共有6個節點
-      - `mov    $0x6032d0,%edx` &larr;節點(node1)
-      - `mov    0x8(%rdx),%rdx` &larr;節點(node n)
-      - 不斷的遍歷節點
-
-      ```c
-      typedef struct{
-          int val;
-          struct node* next;
-      }node;
-      ```
-
-      - 將節點的地址存放到棧上`mov    %rdx,0x20(%rsp,%rsi,2)`
-      - 每次取從當前node算起的第n個node，n取決於上面計算的數值
-      - `node1 --> node2 --> node3 --> node4 --> node5 --> node6 --> null`
-
-      ```asm
-      0x7fffffffded0: 6304544 6304528
-      0x7fffffffdee0: 6304512 6304496
-      0x7fffffffdef0: 6304480 6304464
-      ```
-
-      
-
-14. 將`linkedlist`的head存放到`%rcx`
-
-    - head的next的存放到`%rdx`
-    - `node.next = node_n`
-    - 結尾`node_n.next = null`
-
-15. `mov    (%rax),%eax`取下一個節點(x/uw 地址)
-
-    - `node6.val = 433`
-    - `node5.val = 477`
-    - `node4.val = 691`
-    - `node3.val = 924`
-    - `node2.val = 168`
-    - `node1.val = 332`
-
-16. 每次遍歷節點的值都要大於等於next的值
-
-    - 因此排列後結果為`4 3 2 1 6 5`
+void phase_6(six_arr arr){
+    for(int i=0; i<6; i++){
+        for(int j=0; j<6; j++){
+            if(arr[i] == arr[j]){
+                // bomb!
+            }
+        }
+    }
+    
+    for(int i=0; i<6; i++){
+        arr[i] = 7-arr[i];
+    }
+        
+    for(int i=0; i<5; i++){
+        node[arr[i]].next = node[arr[i+1]];
+    }
+    node[arr[5]] = NULL;
+    
+    for(int i=0; i<5; i++){
+        if(node[arr[i]].val < node[arr[i+1]].val){
+            // bomb!
+        }
+    }
+    
+}
+```
 
 
 
 ### Secret Phase
+
+當我們解完第6個炸彈後會看到下面這段註解，貌似還有什麼為完成
 
 ```c
     /* Wow, they got it!  But isn't something... missing?  Perhaps
      * something they overlooked?  Mua ha ha ha ha! */
 ```
 
-隱層彩蛋躲在`phase_defused()`中
+其實隱層彩蛋就躲在`phase_defused()`裡頭，當輸入數據等於6行時就會觸發。但是要進入`secret_phase`還有令一個條件，我們需要將`phase_3`的輸出改為3個，最後一個為字串類型
+
+```asm
+   0x00000000004015c4 <+0>:	sub    $0x78,%rsp
+   0x00000000004015c8 <+4>:	mov    %fs:0x28,%rax
+   0x00000000004015d1 <+13>:	mov    %rax,0x68(%rsp)
+   0x00000000004015d6 <+18>:	xor    %eax,%eax
+   0x00000000004015d8 <+20>:	cmpl   $0x6,0x202181(%rip)        # 0x603760 <num_input_strings>
+   0x00000000004015df <+27>:	jne    0x40163f <phase_defused+123>
+   0x00000000004015e1 <+29>:	lea    0x10(%rsp),%r8
+   0x00000000004015e6 <+34>:	lea    0xc(%rsp),%rcx
+   0x00000000004015eb <+39>:	lea    0x8(%rsp),%rdx
+   0x00000000004015f0 <+44>:	mov    $0x402619,%esi
+   0x00000000004015f5 <+49>:	mov    $0x603870,%edi
+   0x00000000004015fa <+54>:	callq  0x400bf0 <__isoc99_sscanf@plt>
+   0x00000000004015ff <+59>:	cmp    $0x3,%eax
+   0x0000000000401602 <+62>:	jne    0x401635 <phase_defused+113>
+   0x0000000000401604 <+64>:	mov    $0x402622,%esi
+   0x0000000000401609 <+69>:	lea    0x10(%rsp),%rdi
+   0x000000000040160e <+74>:	callq  0x401338 <strings_not_equal>
+   0x0000000000401613 <+79>:	test   %eax,%eax
+   0x0000000000401615 <+81>:	jne    0x401635 <phase_defused+113>
+   0x0000000000401617 <+83>:	mov    $0x4024f8,%edi
+   0x000000000040161c <+88>:	callq  0x400b10 <puts@plt>
+   0x0000000000401621 <+93>:	mov    $0x402520,%edi
+   0x0000000000401626 <+98>:	callq  0x400b10 <puts@plt>
+   0x000000000040162b <+103>:	mov    $0x0,%eax
+   0x0000000000401630 <+108>:	callq  0x401242 <secret_phase>
+   0x0000000000401635 <+113>:	mov    $0x402558,%edi
+   0x000000000040163a <+118>:	callq  0x400b10 <puts@plt>
+   0x000000000040163f <+123>:	mov    0x68(%rsp),%rax
+   0x0000000000401644 <+128>:	xor    %fs:0x28,%rax
+   0x000000000040164d <+137>:	je     0x401654 <phase_defused+144>
+   0x000000000040164f <+139>:	callq  0x400b30 <__stack_chk_fail@plt>
+   0x0000000000401654 <+144>:	add    $0x78,%rsp
+   0x0000000000401658 <+148>:	retq
+```
+
+#### `secret_phase`
 
 ```asm
    0x0000000000401242 <+0>:	push   %rbx
@@ -730,16 +755,53 @@ unsigned func4(unsigned input, unsigned* rdx, unsigned* rsi){
    0x0000000000401236 <+50>:	jmp    0x40123d <fun7+57>
    0x0000000000401238 <+52>:	mov    $0xffffffff,%eax
    0x000000000040123d <+57>:	add    $0x8,%rsp
-   0x0000000000401241 <+61>:	retq  
+   0x0000000000401241 <+61>:	retq 
 ```
 
+- 首先對字串`bt`作以下處理
+
+```c
+char str[]="bt";
+char* ptr=NULL;
+long res;
+
+res = strol(str, &ptr, 10); // res = 0; ptr = "bt"
+```
+
+- 需要輸入一個參數(小於等於1001)
+- 調用`fun7()` &rarr; `%rdi為"$(36)"`
+- `fun7()`為一個遞迴函式，循環遍歷整個數結構
+- `%rax`返回值需要剛好等於2
+  - 往左後再往右找到
+  - 深度應該是4
+  - 絕對不能遍歷到null
+  - 用1001去看右節點
+- `%rsi輸入參數 %rdx節點val`
 
 
 
+```c
+typedef struct{
+    unsigned val;
+    Node* left;
+    Node* right;
+}Node;
 
-
-
-
+unsigned fun7(Node* n, int val){
+    if(n == NULL){
+   		reutrn 0xffffffff;     
+    }
+    
+    if(n->val == val){
+        return 0;
+    }else if(n->val < val){
+        return 2*(fun7(n->right, val))+1;
+    }else{
+        return 2*fun7(n->right, val);
+    }
+    
+}
+```
 
 
 
