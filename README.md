@@ -9,9 +9,8 @@
 | ------------- | -------------------------------------------- |
 | Labs        | 章節末的實驗解答                           |
 | Labs_Backup | 初始的Lab                                  |
-| *homeworks  | 包含各個章節的回家作業解答                 |
+| *homeworks  | 包含各個章節的回家作業解答(TBD)           |
 | resources   | 上課講義與教科書                           |
-| *essay      | 規劃中，未來有文章講解會放在這裡，方便理解 |
 
 ## log
 
@@ -28,6 +27,8 @@
 
 ## 聯絡我
 
-📌email: linhoway@gmail.com
+📌[E-mail](linhoway@gmai)
+
+📌[Lab下載地址](http://csapp.cs.cmu.edu/3e/students.html)
 
 📌[更多資源](https://equinox-mahogany-b74.notion.site/CMU-15-213-Intro-to-Computer-Systems-c0d76b0ec3f840ff8f5c46113a9b43c3)
