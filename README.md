@@ -19,7 +19,7 @@
 
   * [X] **Data Lab**
   * [x] **Bomb Lab**
-  * [ ] **Attack Lab**
+  * [x] **Attack Lab**
   * [ ] **Cache Lab**
   * [ ] **Shell Lab**
   * [ ] **Malloc Lab**
