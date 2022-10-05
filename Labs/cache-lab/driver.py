@@ -48,7 +48,7 @@ def main():
     autograde = opts.autograde
 
     # Check the correctness of the cache simulator
-    print "Part A: Testing cache simulator"
+    print z"Part A: Testing cache simulator"
     print "Running ./test-csim"
     p = subprocess.Popen("./test-csim", 
                          shell=True, stdout=subprocess.PIPE)
