@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
+#include <assert.h>
 #include "cachelab.h"
 
 
@@ -9,13 +11,18 @@ typedef struct{
 
     uint32_t vaild;
     uint32_t tag;
-    uint64_t timeStamp;
+    uint64_t timeStamp; // for LRU
 }cacheLine;
 
+#define BUFFER_LENGTH   1024
+#define OP_INFO         1
 
 static cacheLine** virtual_cache = NULL;
 static FILE* fp;
-static uint8_t file_read_Buffer[1024];
+static uint8_t file_read_Buffer[BUFFER_LENGTH]={0};
+static uint8_t s=0, E=0, b=0;
+static int miss=0, hits=0, evictions=0;
+static uint64_t ticks=0;
 
 /**
  * 
@@ -27,6 +34,163 @@ static char get_operation(char* str){
     }
 
     return str[1];
+}
+
+
+/**
+ * 
+ */ 
+static void load_operation(uint32_t index){
+
+    uint32_t addr=0;
+    uint32_t dataBytes=0;
+    char op;
+
+    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
+
+    uint32_t offset = addr & (~(0xff << b));
+    uint32_t set = (addr >> b) & (~(0xff << s));
+    uint32_t tag = addr >> (s+b);
+
+#if OP_INFO
+    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
+
+    bool find = false;
+
+    for(int i=0; i<E; i++){
+
+        if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
+
+            find = true;
+            break;
+        }
+    }
+
+    if(find){
+
+        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
+    }else{
+
+        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
+    }
+
+#endif
+
+}
+
+
+/**
+ * 
+ */ 
+static void modify_operation(uint32_t index){
+
+    uint32_t addr=0;
+    uint32_t dataBytes=0;
+    char op;
+
+    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
+
+    uint32_t offset = addr & (~(0xff << b));
+    uint32_t set = (addr >> b) & (~(0xff << s));
+    uint32_t tag = addr >> (s+b);
+
+#if OP_INFO
+    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
+
+    bool find = false;
+
+    for(int i=0; i<E; i++){
+
+        if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
+
+            find = true;
+            break;
+        }
+    }
+
+    if(find){
+
+        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
+    }else{
+
+        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
+    }
+
+#endif
+
+}
+
+
+/**
+ * 
+ */ 
+static void save_operation(uint32_t index){
+
+    uint32_t addr=0;
+    uint32_t dataBytes=0;
+    char op;
+
+    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
+
+    uint32_t offset = addr & (~(0xff << b));
+    uint32_t set = (addr >> b) & (~(0xff << s));
+    uint32_t tag = addr >> (s+b);
+
+#if OP_INFO
+    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
+
+    bool find = false;
+
+    for(int i=0; i<E; i++){
+
+        if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
+
+            find = true;
+            break;
+        }
+    }
+
+    if(find){
+
+        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
+    }else{
+
+        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
+    }
+
+#endif
+
+}
+
+
+/**
+ * 
+ */ 
+static void cmd_parsing(){
+
+    assert(file_read_Buffer);
+    uint32_t index=0;
+
+    while(file_read_Buffer[index]){
+
+        switch(file_read_Buffer[index]){
+
+            case 'L':
+                load_operation(index);
+            break;
+
+            case 'M':
+                modify_operation(index);
+            break;
+
+            case 'S':
+                save_operation(index);
+            break;
+        }
+
+        index++;
+    }
+    
 }
 
 
@@ -67,9 +231,11 @@ static void print_help_message(){
  */ 
 static void cache_init(uint8_t s, uint8_t E){
 
-    virtual_cache = (cacheLine**)malloc(sizeof(cacheLine*)*s);
+    uint32_t sets = 2 << s;
 
-    for(int i=0; i<s; i++){
+    virtual_cache = (cacheLine**)malloc(sizeof(cacheLine*) * sets);
+
+    for(int i=0; i<sets; i++){
 
         virtual_cache[i] = (cacheLine*)malloc(sizeof(cacheLine)*E);
     }
@@ -77,7 +243,6 @@ static void cache_init(uint8_t s, uint8_t E){
 
 int main(int argc, char* argv[]){
 
-    uint8_t s=0, E=0, b=0;
 
     for(int i=1; i<argc; i++){
 
@@ -106,10 +271,10 @@ int main(int argc, char* argv[]){
             break;
 
             case 't':
-                fp = fopen(argv[++i], "w+");
-                size_t ret = fread(file_read_Buffer, 1, 1, fp);
+                fp = fopen(argv[++i], "r");
+                assert(fp);
+                fread(file_read_Buffer, sizeof(char), BUFFER_LENGTH, fp);
                 fclose(fp);
-                printf("read file result: %lu\n", ret);
             break;
 
             default:
@@ -117,10 +282,8 @@ int main(int argc, char* argv[]){
         }
     }
 
-    printf("s = %u, E = %u, b = %u\n", s, E, b);
-    printf("trace file read: %ld\n", strlen((char*)file_read_Buffer));
-
     cache_init(s, E);
+    cmd_parsing();
     // printSummary(0, 0, 0);
 
     return 0;

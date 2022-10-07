@@ -1,3 +1,7 @@
+# Cache Labb實驗紀錄
+
+## Intro
+
 *This is the handout directory for the CS:APP Cache Lab.* 
 
 ************************
@@ -22,11 +26,11 @@ Check everything at once (this is the program that your instructor runs):
 Files:
 ******
 
-# You will modifying and handing in these two files
+### You will modifying and handing in these two files
 `csim.c`       Your cache simulator
 `trans.c`      Your transpose function
 
-# Tools for evaluating your simulator and transpose function
+### Tools for evaluating your simulator and transpose function
 `Makefile`     Builds the simulator and tools
 `README.md`       This file
 `driver.py*`   The driver program, runs test-csim and test-trans
@@ -37,3 +41,7 @@ Files:
 `test-trans.c` Tests your transpose function
 `tracegen.c`   Helper program used by test-trans
 `traces/`      Trace files used by test-csim.c
+
+## Part. A
+
+編寫一個LRU策略的`cache simulator`
