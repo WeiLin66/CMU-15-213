@@ -19,7 +19,7 @@ typedef struct{
 
 static cacheLine** virtual_cache = NULL;
 static FILE* fp;
-static uint8_t file_read_Buffer[BUFFER_LENGTH]={0};
+static char file_read_Buffer[BUFFER_LENGTH]={0};
 static uint8_t s=0, E=0, b=0;
 static int miss=0, hits=0, evictions=0;
 static uint64_t ticks=0;
@@ -40,41 +40,68 @@ static char get_operation(char* str){
 /**
  * 
  */ 
+static uint8_t LRU(uint8_t set){
+
+    int repalce = 0;
+
+    for(int i=1; i<E; i++){
+
+        repalce = virtual_cache[set][i].timeStamp < virtual_cache[set][repalce].timeStamp ? i : repalce;
+    }
+
+    return repalce;
+}
+
+
+/**
+ * 
+ */ 
 static void load_operation(uint32_t index){
 
     uint32_t addr=0;
     uint32_t dataBytes=0;
     char op;
 
-    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
+    sscanf(file_read_Buffer+index, "%c %x, %d", &op, &addr, &dataBytes);
 
-    uint32_t offset = addr & (~(0xff << b));
+    // uint32_t offset = addr & (~(0xff << b));
     uint32_t set = (addr >> b) & (~(0xff << s));
     uint32_t tag = addr >> (s+b);
 
-#if OP_INFO
-    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
-
     bool find = false;
+    int empty_line = -1;
 
-    for(int i=0; i<E; i++){
+    for(int i=E-1; i>=0; i--){
 
         if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
 
             find = true;
             break;
+        }else if(virtual_cache[set][i].vaild == 0){
+
+            empty_line = i;
         }
     }
 
     if(find){
 
-        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
+        hits++;
+
     }else{
 
-        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
-    }
+        miss++;
 
-#endif
+        /* eviction occur */
+        if(empty_line == -1){
+
+            evictions++;
+            empty_line = LRU(set);
+        }
+
+        virtual_cache[set][empty_line].vaild = 1;
+        virtual_cache[set][empty_line].tag = tag;
+        virtual_cache[set][empty_line].timeStamp = ticks;
+    }
 
 }
 
@@ -84,40 +111,8 @@ static void load_operation(uint32_t index){
  */ 
 static void modify_operation(uint32_t index){
 
-    uint32_t addr=0;
-    uint32_t dataBytes=0;
-    char op;
-
-    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
-
-    uint32_t offset = addr & (~(0xff << b));
-    uint32_t set = (addr >> b) & (~(0xff << s));
-    uint32_t tag = addr >> (s+b);
-
-#if OP_INFO
-    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
-
-    bool find = false;
-
-    for(int i=0; i<E; i++){
-
-        if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
-
-            find = true;
-            break;
-        }
-    }
-
-    if(find){
-
-        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
-    }else{
-
-        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
-    }
-
-#endif
-
+    load_operation(index);
+    hits++;
 }
 
 
@@ -126,40 +121,7 @@ static void modify_operation(uint32_t index){
  */ 
 static void save_operation(uint32_t index){
 
-    uint32_t addr=0;
-    uint32_t dataBytes=0;
-    char op;
-
-    sscanf(file_read_Buffer+index, "%c %d, %d", &op, &addr, &dataBytes);
-
-    uint32_t offset = addr & (~(0xff << b));
-    uint32_t set = (addr >> b) & (~(0xff << s));
-    uint32_t tag = addr >> (s+b);
-
-#if OP_INFO
-    printf("tag = 0x%X, set = 0x%X, offset = 0x%X\n", tag, set, offset);
-
-    bool find = false;
-
-    for(int i=0; i<E; i++){
-
-        if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
-
-            find = true;
-            break;
-        }
-    }
-
-    if(find){
-
-        printf("op = %c, addr = %u, bytes = %u hits!\n", op, addr, dataBytes);
-    }else{
-
-        printf("op = %c, addr = %u, bytes = %u miss!\n", op, addr, dataBytes);
-    }
-
-#endif
-
+    load_operation(index);
 }
 
 
@@ -189,6 +151,7 @@ static void cmd_parsing(){
         }
 
         index++;
+        ticks++;
     }
     
 }
@@ -284,7 +247,7 @@ int main(int argc, char* argv[]){
 
     cache_init(s, E);
     cmd_parsing();
-    // printSummary(0, 0, 0);
+    printSummary(hits, miss, evictions);
 
     return 0;
 }
