@@ -14,18 +14,19 @@ typedef struct{
     uint64_t timeStamp; // for LRU
 }cacheLine;
 
-#define BUFFER_LENGTH   1024
+#define MAX_LEN         256
 #define OP_INFO         1
+#define U32MAX          0xFFFFFFFF            
 
 static cacheLine** virtual_cache = NULL;
-static FILE* fp;
-static char file_read_Buffer[BUFFER_LENGTH]={0};
 static uint8_t s=0, E=0, b=0;
 static int miss=0, hits=0, evictions=0;
 static uint64_t ticks=0;
+static bool print_msg = false;
+
 
 /**
- * 
+ * func for getting operator
  */ 
 static char get_operation(char* str){
 
@@ -38,7 +39,7 @@ static char get_operation(char* str){
 
 
 /**
- * 
+ * func for applying LRU algo.
  */ 
 static uint8_t LRU(uint8_t set){
 
@@ -54,18 +55,24 @@ static uint8_t LRU(uint8_t set){
 
 
 /**
- * 
+ * func for loading data from cache
  */ 
-static void load_operation(uint32_t index){
+static void load_operation(char* line){
 
     uint32_t addr=0;
     uint32_t dataBytes=0;
     char op;
 
-    sscanf(file_read_Buffer+index, "%c %x, %d", &op, &addr, &dataBytes);
+    sscanf(line, " %c %x,%u", &op, &addr, &dataBytes);
 
-    // uint32_t offset = addr & (~(0xff << b));
-    uint32_t set = (addr >> b) & (~(0xff << s));
+    if(op != 'L' && op != 'M' && op != 'S'){
+
+        return;
+    }
+
+    hits = op == 'M' ? hits+1 : hits;
+
+    uint32_t set = (addr >> b) & (~(U32MAX << s));
     uint32_t tag = addr >> (s+b);
 
     bool find = false;
@@ -107,53 +114,23 @@ static void load_operation(uint32_t index){
 
 
 /**
- * 
+ * func for parsing commands from trace file
  */ 
-static void modify_operation(uint32_t index){
+static void cmd_parsing(char* filename){
 
-    load_operation(index);
-    hits++;
-}
+    char line[MAX_LEN];
+    FILE* fp = fopen(filename, "r");
 
+    while(!feof(fp) && !ferror(fp)){
 
-/**
- * 
- */ 
-static void save_operation(uint32_t index){
+        strcpy(line, "\n");
+        fgets(line, MAX_LEN, fp);
+        load_operation(line);
 
-    load_operation(index);
-}
-
-
-/**
- * 
- */ 
-static void cmd_parsing(){
-
-    assert(file_read_Buffer);
-    uint32_t index=0;
-
-    while(file_read_Buffer[index]){
-
-        switch(file_read_Buffer[index]){
-
-            case 'L':
-                load_operation(index);
-            break;
-
-            case 'M':
-                modify_operation(index);
-            break;
-
-            case 'S':
-                save_operation(index);
-            break;
-        }
-
-        index++;
-        ticks++;
+        ticks++;        
     }
-    
+
+    fclose(fp);    
 }
 
 
@@ -190,11 +167,11 @@ static void print_help_message(){
 
 
 /**
- * 
+ * func for initializing cache memory
  */ 
 static void cache_init(uint8_t s, uint8_t E){
 
-    uint32_t sets = 2 << s;
+    uint32_t sets = 1 << s;
 
     virtual_cache = (cacheLine**)malloc(sizeof(cacheLine*) * sets);
 
@@ -204,8 +181,31 @@ static void cache_init(uint8_t s, uint8_t E){
     }
 }
 
+
+/**
+ * func for releasing cache memory
+ */ 
+static void free_cache(){
+
+    uint32_t sets = 1 << s;
+
+    for(int i=0; i<sets; i++){
+
+        free(virtual_cache[i]);
+        virtual_cache[i] = NULL;
+    }
+
+    free(virtual_cache);
+    virtual_cache = NULL;
+}
+
+
+/**
+ * main func
+ */ 
 int main(int argc, char* argv[]){
 
+    char filename[MAX_LEN];
 
     for(int i=1; i<argc; i++){
 
@@ -218,7 +218,7 @@ int main(int argc, char* argv[]){
             break;
 
             case 'v':
-                printf("print info for trace files...\n");
+                print_msg = true;
             break;
 
             case 's':
@@ -234,10 +234,7 @@ int main(int argc, char* argv[]){
             break;
 
             case 't':
-                fp = fopen(argv[++i], "r");
-                assert(fp);
-                fread(file_read_Buffer, sizeof(char), BUFFER_LENGTH, fp);
-                fclose(fp);
+                strcpy(filename, argv[++i]);
             break;
 
             default:
@@ -246,8 +243,9 @@ int main(int argc, char* argv[]){
     }
 
     cache_init(s, E);
-    cmd_parsing();
+    cmd_parsing(filename);
     printSummary(hits, miss, evictions);
+    free_cache();
 
     return 0;
 }
