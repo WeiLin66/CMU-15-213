@@ -16,7 +16,7 @@ typedef struct{
 
 #define MAX_LEN         256
 #define OP_INFO         1
-#define U32MAX          0xFFFFFFFF            
+#define U64MAX          0xFFFFFFFFFFFFFFFF            
 
 static cacheLine** virtual_cache = NULL;
 static uint8_t s=0, E=0, b=0;
@@ -59,20 +59,25 @@ static uint8_t LRU(uint8_t set){
  */ 
 static void load_operation(char* line){
 
-    uint32_t addr=0;
+    uint64_t addr=0;
     uint32_t dataBytes=0;
     char op;
 
-    sscanf(line, " %c %x,%u", &op, &addr, &dataBytes);
+    sscanf(line, " %c %lx,%u", &op, &addr, &dataBytes);
 
     if(op != 'L' && op != 'M' && op != 'S'){
 
         return;
     }
 
-    hits = op == 'M' ? hits+1 : hits;
+    if(print_msg){
 
-    uint32_t set = (addr >> b) & (~(U32MAX << s));
+        printf("%c %lx,%u ", op, addr, dataBytes);
+    }    
+
+    hits = op == 'M' ? hits+1 : hits; 
+
+    uint32_t set = (addr >> b) & (~(U64MAX << s));
     uint32_t tag = addr >> (s+b);
 
     bool find = false;
@@ -83,6 +88,7 @@ static void load_operation(char* line){
         if(virtual_cache[set][i].vaild && virtual_cache[set][i].tag == tag){
 
             find = true;
+            virtual_cache[set][i].timeStamp = ticks;
             break;
         }else if(virtual_cache[set][i].vaild == 0){
 
@@ -94,21 +100,44 @@ static void load_operation(char* line){
 
         hits++;
 
+        if(print_msg){
+
+            printf("hit ");
+        }        
     }else{
 
         miss++;
 
+        if(print_msg){
+
+            printf("miss ");
+        }  
         /* eviction occur */
         if(empty_line == -1){
 
             evictions++;
             empty_line = LRU(set);
+            
+            if(print_msg){
+
+                printf("eviction ");
+            }             
         }
 
         virtual_cache[set][empty_line].vaild = 1;
         virtual_cache[set][empty_line].tag = tag;
         virtual_cache[set][empty_line].timeStamp = ticks;
     }
+
+    if(op == 'M' && print_msg){
+
+        printf("hit ");
+    } 
+
+    if(print_msg){
+
+        printf("\n");
+    }  
 
 }
 
