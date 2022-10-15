@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <assert.h>
 #include "cachelab.h"
 
 
@@ -15,7 +14,6 @@ typedef struct{
 }cacheLine;
 
 #define MAX_LEN         256
-#define OP_INFO         1
 #define U64MAX          0xFFFFFFFFFFFFFFFF            
 
 static cacheLine** virtual_cache = NULL;
@@ -75,8 +73,6 @@ static void load_operation(char* line){
         printf("%c %lx,%u ", op, addr, dataBytes);
     }    
 
-    hits = op == 'M' ? hits+1 : hits; 
-
     uint32_t set = (addr >> b) & (~(U64MAX << s));
     uint32_t tag = addr >> (s+b);
 
@@ -96,6 +92,8 @@ static void load_operation(char* line){
         }
     }
 
+    hits = op == 'M' ? hits+1 : hits; 
+
     if(find){
 
         hits++;
@@ -111,7 +109,8 @@ static void load_operation(char* line){
         if(print_msg){
 
             printf("miss ");
-        }  
+        }
+          
         /* eviction occur */
         if(empty_line == -1){
 
@@ -206,7 +205,7 @@ static void cache_init(uint8_t s, uint8_t E){
 
     for(int i=0; i<sets; i++){
 
-        virtual_cache[i] = (cacheLine*)malloc(sizeof(cacheLine)*E);
+        virtual_cache[i] = (cacheLine*)malloc(sizeof(cacheLine) * E);
     }
 }
 
@@ -235,6 +234,7 @@ static void free_cache(){
 int main(int argc, char* argv[]){
 
     char filename[MAX_LEN];
+    uint8_t input_check = 0;
 
     for(int i=1; i<argc; i++){
 
@@ -252,23 +252,32 @@ int main(int argc, char* argv[]){
 
             case 's':
                 s = atoi(argv[++i]);
+                input_check++;
             break;
 
             case 'E':
                 E = atoi(argv[++i]);
+                input_check++;
             break;
 
             case 'b':
                 b = atoi(argv[++i]);
+                input_check++;
             break;
 
             case 't':
                 strcpy(filename, argv[++i]);
+                input_check++;
             break;
 
             default:
             break;
         }
+    }
+
+    if(input_check < 4){
+
+        exit(0);
     }
 
     cache_init(s, E);
