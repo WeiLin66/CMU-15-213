@@ -19,17 +19,39 @@ int is_transpose(int M, int N, int A[N][M], int B[M][N]);
  *     searches for that string to identify the transpose function to
  *     be graded. 
  */
+#define BLOCK 8
 char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N]){
 
-    int i, j, tmp;
+    int i, j, i1;
 
-    for (i = 0; i < M; i++) {
-        for (j = 0; j < N; j++) {
-            tmp = A[j][i];
-            B[i][j] = tmp;
+    for (i = 0; i < M; i += BLOCK) {
+
+        for (j = 0; j < N; j += BLOCK) {
+            
+            /* B * B mini block */
+            for(i1=i; i1<i+BLOCK; i1++) {
+
+                int temp_0 = A[i1][j];
+                int temp_1 = A[i1][j+1];
+                int temp_2 = A[i1][j+2];
+                int temp_3 = A[i1][j+3];
+                int temp_4 = A[i1][j+4];
+                int temp_5 = A[i1][j+5];
+                int temp_6 = A[i1][j+6];
+                int temp_7 = A[i1][j+7];
+
+                B[j][i1] = temp_0;
+                B[j+1][i1] = temp_1;
+                B[j+2][i1] = temp_2;
+                B[j+3][i1] = temp_3;
+                B[j+4][i1] = temp_4;
+                B[j+5][i1] = temp_5;
+                B[j+6][i1] = temp_6;
+                B[j+7][i1] = temp_7;
+            }
         }
-    }      
+    }
 }
 
 /* 
@@ -55,19 +77,40 @@ void trans(int M, int N, int A[N][M], int B[M][N])
 }
 
 /* 
- * trans2
+ * trans32*32
  */
-char trans_desc2[] = "Simple transpose func2";
-void trans2(int M, int N, int A[N][M], int B[M][N]){
-    
-    int i, j, tmp;
+char trans_desc32[] = "Simple transpose func32";
+void trans32(int M, int N, int A[N][M], int B[M][N]){ 
 
-    for (i = 0; i < M; i++) {
-        for (j = 0; j < N; j++) {
-            tmp = A[j][i];
-            B[i][j] = tmp;
+    int i, j, i1, temp[BLOCK];
+
+    for (i = 0; i < M; i += BLOCK) {
+
+        for (j = 0; j < N; j += BLOCK) {
+            
+            /* B * B mini block */
+            for(i1=i; i1<i+BLOCK; i1++) {
+
+                temp[0] = A[i1][j];
+                temp[1] = A[i1][j+1];
+                temp[2] = A[i1][j+2];
+                temp[3] = A[i1][j+3];
+                temp[4] = A[i1][j+4];
+                temp[5] = A[i1][j+5];
+                temp[6] = A[i1][j+6];
+                temp[7] = A[i1][j+7];
+
+                B[j][i1] = temp[0];
+                B[j+1][i1] = temp[1];
+                B[j+2][i1] = temp[2];
+                B[j+3][i1] = temp[3];
+                B[j+4][i1] = temp[4];
+                B[j+5][i1] = temp[5];
+                B[j+6][i1] = temp[6];
+                B[j+7][i1] = temp[7];
+            }
         }
-    }  
+    }
 
 }
 
@@ -86,7 +129,7 @@ void registerFunctions()
     /* Register any additional transpose functions */
     registerTransFunction(trans, trans_desc); 
 
-    // registerTransFunction(trans2, trans_desc2);
+    registerTransFunction(trans32, trans_desc32);
 
 }
 
