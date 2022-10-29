@@ -1,4 +1,4 @@
-# Cache Labb實驗紀錄
+# Cache Lab實驗紀錄
 
 ## 實驗簡介
 
@@ -42,13 +42,9 @@ Files:
 `tracegen.c`   Helper program used by test-trans
 `traces/`      Trace files used by test-csim.c
 
-## Part. A
-
-該實驗值主要編寫一個LRU策略的虛擬緩存，透過讀取trace文件指令模擬緩存的操作，並對`hits, miss, eviction`數量進行分析
-
 ### 環境配置
 
-在Part. A中我們需要讀取trace文件中的命令來評估緩存的性能，而這些trace文件是由`Valgrind`這告軟體生成的，因此建議先進行安裝
+我們需要讀取trace文件中的命令來評估緩存的性能，而這些trace文件是由`Valgrind`這告軟體生成的，因此建議先進行安裝
 
 > 輸入 `sudo apt install valgrind`
 
@@ -56,7 +52,7 @@ Files:
 
 輸入完指令後可以在終端中看到以下圖的格式輸出，它代表程式執行過程中緩存的運作紀錄
 
-- I &rarr; 讀取指令(*該實驗不需要實現該指令*)
+- I &rarr; 讀取指令(*實驗不需要實現該指令*)
 - M &rarr; 修改數據並存回緩存
 - L &rarr; 讀取數據
 - S &rarr; 儲存數據
@@ -64,6 +60,10 @@ Files:
 > 格式： [操作指令], [64 bits地址], [數據大小]
 
 ![image-20221029145935169](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029145935169.png)
+
+## Part. A
+
+該實驗值主要編寫一個LRU策略的虛擬緩存，透過讀取trace文件指令模擬緩存的操作，並對`hits, miss, eviction`數量進行分析
 
 ### 實驗須知
 
@@ -369,4 +369,106 @@ static void free_cache(){
     virtual_cache = NULL;
 }
 ```
+
+## Part. B
+
+實驗B要求實現一個矩陣的轉移函式，並盡可能的降低緩存不命中的次數
+
+實驗總共要編寫三種不同大小的轉移函式
+
+1. 32 * 32
+2. 64 * 64
+3. 61 * 67
+
+Lab文件有提到miss的範圍與得分佔比，例如64 * 64的矩陣測試結果miss要小於1300才能得到滿分
+
+![image-20221029220634538](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029220634538.png)
+
+### 實驗須知
+
+1. 我們需要在`trans.c`中編寫並測試轉移函式
+2. 轉移函式中**最多只能使用12個**``int`類型的局部變數，若轉移函式中調用其他函式，也要將該函式中的局部變數考慮進去
+3. 不能使用位運算在一個整型變數存放多個值
+4. 不允許使用``long`類型局部變數
+5. `transpose_submit(int M, int N, int A[N][M], int B[M][N])`中陣列參數只允許修改B
+6. 轉移函式中不允許宣告陣列變數或使用`malloc`
+
+### 如何進行驗證
+
+- `./test-trans -M 32 -N 32` for 32 * 32轉移矩陣
+- `./test-trans -M 64 -N 64` for 64 * 64轉移矩陣
+- `./test-trans -M 61 -N 67` for 61 * 67轉移矩陣
+
+#### 註冊測試函式
+
+註冊多個不同的函式，可以在進行驗證時同時執行，最多可以註冊100個不同的轉移函式
+
+只需要在`registerFunctions()`中調用`registerTransFunction()`並填入該函式的註解字串以及函式名就可以了
+
+> 註冊函式細節請見`cachelab.c/.h`
+
+```c
+/* 
+ * trans - A simple baseline transpose function, not optimized for the cache.
+ */
+char trans_desc[] = "Simple row-wise scan transpose";
+void trans(int M, int N, int A[N][M], int B[M][N]){
+    int i, j, tmp;
+
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < M; j++) {
+            tmp = A[i][j];
+            B[j][i] = tmp;
+        }
+    }    
+}
+
+void registerFunctions(){
+    
+    registerTransFunction(transpose_submit, transpose_submit_desc); 
+
+    registerTransFunction(trans, trans_desc); 
+
+    registerTransFunction(trans32, trans_desc32);
+
+    registerTransFunction(trans64, trans_desc64);
+
+    registerTransFunction(trans6167, trans_desc6167);
+}
+```
+
+
+
+### Blocking
+
+Blocking是一種記憶體區塊化處理的技術，透過提高循環內的局部性降低不命中率
+
+為了演示Blocking為何有效，我們先查看一般轉移矩陣的邏輯
+
+![image-20221029225340907](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029225340907.png)
+
+```c
+void trans(int M, int N, int A[N][M], int B[M][N]){
+    int i, j, tmp;
+
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < M; j++) {
+            tmp = A[i][j];
+            B[j][i] = tmp;
+        }
+    }    
+}
+```
+
+
+
+
+
+### 程式撰寫
+
+#### 32*32
+
+#### 64*64
+
+#### 61*67
 
