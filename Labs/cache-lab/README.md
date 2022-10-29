@@ -54,7 +54,7 @@ Files:
 
 完成安裝後可以透過指令`valgrind --log-fd=1 --tool=lackey -v --trace-mem=yes ls -l`，追蹤目錄下所有可執行文件的``cache`使用狀況
 
-![image-20221029145935169](/home/zach/snap/typora/76/.config/Typora/typora-user-images/image-20221029145935169.png)
+![image-20221029145935169](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029145935169.png)
 
 ### 檔案說明
 
