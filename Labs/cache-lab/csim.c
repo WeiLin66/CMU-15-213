@@ -29,6 +29,7 @@ static bool print_msg = false;
 static char get_operation(char* str){
 
     if(strlen(str) <= 1){
+        
         return '\0';
     }
 
