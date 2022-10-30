@@ -296,10 +296,10 @@ void trans64(int M, int N, int A[N][M], int B[M][N]){
 }
 
 /* 
- * trans67*61
+ * trans61*67
  */
-char trans_desc6761[] = "Simple transpose func6761";
-void trans6761(int M, int N, int A[N][M], int B[M][N]){ 
+char trans_desc6167[] = "Simple transpose func6167";
+void trans6167(int M, int N, int A[N][M], int B[M][N]){ 
 
     int i, j;
     int tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8;
@@ -356,6 +356,10 @@ void registerFunctions()
     registerTransFunction(trans, trans_desc); 
 
     // registerTransFunction(trans32, trans_desc32);
+
+    // registerTransFunction(trans64, trans_desc64);
+
+    // registerTransFunction(trans6167, trans_desc6167);
 
 }
 

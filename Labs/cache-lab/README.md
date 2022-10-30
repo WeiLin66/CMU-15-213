@@ -443,9 +443,11 @@ void registerFunctions(){
 
 Blocking是一種記憶體區塊化處理的技術，透過提高循環內的局部性降低不命中率
 
-為了演示Blocking為何有效，我們先查看一般轉移矩陣的邏輯
+為了演示Blocking為何有效，我們先查看一般轉移矩陣的邏輯:
 
-![image-20221029225340907](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029225340907.png)
+- 先遍歷矩陣A的一列(row)，然後複製到矩陣B的一行上(column)
+- 假設N, M均為8
+- 假設緩存有4組，每組一行，一行存放8bytes
 
 ```c
 void trans(int M, int N, int A[N][M], int B[M][N]){
