@@ -443,26 +443,89 @@ void registerFunctions(){
 
 Blocking是一種記憶體區塊化處理的技術，透過提高循環內的局部性降低不命中率
 
-為了演示Blocking為何有效，我們先查看一般轉移矩陣的邏輯:
+為了演示Blocking為何有效，我們編寫一個簡單的小函式，計算矩陣A的每列與矩陣B的每行相乘的加總
+
+#### non-blocking
 
 - 先遍歷矩陣A的一列(row)，然後複製到矩陣B的一行上(column)
 - 假設N, M均為8
-- 假設緩存有4組，每組一行，一行存放8bytes
+- 假設緩存有4組，每組一行，一行存放8個整數
 
 ```c
-void trans(int M, int N, int A[N][M], int B[M][N]){
-    int i, j, tmp;
+int multi(int A[8][8], int B[8][8]){
+    int i, j, temp=0, sum=0;
 
-    for (i = 0; i < N; i++) {
-        for (j = 0; j < M; j++) {
-            tmp = A[i][j];
-            B[j][i] = tmp;
+    for (i = 0; i < 8; i++) {
+        for (j = 0; j < 8; j++) {
+            temp = A[i][j] * B[j][i];
+            sum += temp;
         }
-    }    
+    }
+    
+    return sum;
 }
 ```
 
+![non-blocking](https://raw.githubusercontent.com/WeiLin66/pictures/main/202210301622085.png)
 
+##### 矩陣miss數
+
+由於緩存的一行剛好可以容納矩陣A的一列，所以總共會發生8次miss，由於緩存只有4組，所以當遍歷到第4列時就會覆蓋掉第0列中緩存內容(發生`eviction`)，但由於是逐列掃描，所以差別不大
+
+B矩陣是逐行(column)存放的，也就是A矩陣的a0~a7 &rarr; b0, b8, b16, b24, b32, b40, b48, b56
+
+- b0, b8, b16, b24均發生miss，並分別將其加載進block0~block3
+- b32, b40, b48, b56發生miss + eviction，**將加載的數據覆蓋block0~block3**
+- 在每次循環中緩存內要不沒有數據，不然就是存放其他列數據，產生miss和eviction
+- 因此每行均會發生8次miss，總長8行，miss數來到64次
+
+> 總miss數為64 + 8 = 72次miss
+
+#### blocking
+
+- 將8 * 8矩陣分成4個4 * 4小塊
+- 每次處理其中一個塊
+- 將A矩陣塊中的一列複製給B矩陣塊中的一行
+- A矩陣處理順率為先左到右，再上到下
+- B矩陣處理順率為先上到下，再左到右
+
+```C
+int multi(int A[8][8], int B[8][8]){
+    int i, j, temp=0, sum=0;
+    
+	/* 處理4個塊 */
+    for (i = 0; i < 8; i+=4) {
+        for (j = 0; j < 8; j+=4) {
+            
+            /* 處理每一個小塊 */
+            for(int i1=i; i1<i+4; i1++){
+                for(int j1=j; j1<j+4; j1++){
+					temp = A[i1][j1] * B[j1][i1];
+                    sum += temp;
+                }
+            }
+        }
+    }
+    
+    return sum;
+}
+```
+
+![blocking](https://raw.githubusercontent.com/WeiLin66/pictures/main/202210301716397.png)
+
+##### 矩陣miss數
+
+由於緩存的一行剛好可以容納矩陣A的一列，所以左上的小塊在加載時會連同又上的份一同加載；同理左下的塊加載時，右下的塊需要的數據也已經在緩存中了。所以blocking方法對矩陣A來說沒變，依然是8次miss
+
+對於B矩陣來說，每個塊產生的miss:
+
+- 將A矩陣數據複製給b0, b8, b16, b24，同時將其代表的列數據加載進緩存
+- 下一次循環對b1, b9, b17, b25操作均不會發生miss，以此類推
+- 對調操作
+
+
+
+### 為何blocking有效
 
 
 
