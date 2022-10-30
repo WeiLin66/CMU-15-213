@@ -292,7 +292,6 @@ void trans64(int M, int N, int A[N][M], int B[M][N]){
             }
         }
     }
-
 }
 
 /* 
