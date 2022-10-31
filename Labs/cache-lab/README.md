@@ -167,7 +167,7 @@ int main(int argc, char* argv[]){
 
 #### 初始化cache
 
-利用得到的參數，為cache分配動態記憶體，其function為`cache_init(s, E)`，每一行cache定義為結構體`cacheLine`
+利用得到的參數，為cache分配動態記憶體，其function為`cache_init(s, E)`，緩存中的行定義為結構體`cacheLine`
 
 ```c
 typedef struct{
