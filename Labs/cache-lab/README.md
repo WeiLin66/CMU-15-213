@@ -43,7 +43,7 @@
 
 ## Part. A
 
-該實驗值主要編寫一個LRU策略的虛擬緩存，透過讀取trace文件指令模擬緩存的操作，並對`hits, miss, eviction`數量進行分析
+該實驗值主要編寫一個LRU策略的虛擬緩存，透過讀取trace文件指令模擬緩存的操作，並對`hits`, `miss`, `eviction`數量進行分析
 
 ### 實驗須知
 
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]){
 
 #### 初始化cache
 
-利用得到的參數，為cache分配動態記憶體，其function為`cache_init(s, E)`，每一行cache定義為結構體`cacheLine`
+利用得到的參數，為cache分配動態記憶體，其function為`cache_init(s, E)`，緩存中的行定義為結構體`cacheLine`
 
 ```c
 typedef struct{
