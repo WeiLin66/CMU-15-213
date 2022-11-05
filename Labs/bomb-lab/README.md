@@ -1,4 +1,4 @@
-# bomb lab實驗紀錄
+# Bomb Lab實驗紀錄
 
 ## GDB常用指令
 
@@ -852,3 +852,6 @@ unsigned fun7(Node* n, int val){
 
 順著這個邏輯我們可以找到`22`就是這題的解
 
+## 資源
+
+https://github.com/WeiLin66/CMU-15-213/tree/main/Labs/bomb-lab

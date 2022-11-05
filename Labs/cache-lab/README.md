@@ -4,26 +4,6 @@
 
 *This is the handout directory for the CS:APP Cache Lab.* 
 
-************************
-Running the autograders:
-************************
-
-Before running the autograders, compile your code:
-    `linux> make`
-
-Check the correctness of your simulator:
-    `linux> ./test-csim`
-
-Check the correctness and performance of your transpose functions:
- `   linux> ./test-trans -M 32 -N 32`
-    `linux> ./test-trans -M 64 -N 64`
-   ` linux> ./test-trans -M 61 -N 67`
-
-Check everything at once (this is the program that your instructor runs):
-   ` linux> ./driver.py    `
-
-******
-Files:
 ******
 
 ### 欲修改檔案
@@ -68,7 +48,7 @@ Files:
 ### 實驗須知
 
 1. 我們需要在`csim.c`中實現虛擬緩存
-2. 由於測試時會使用不同的``sets`, `line`, `block`緩存使用的記憶體空間要使用`malloc`動態分配
+2. 由於測試時會使用不同的`sets`, `line`, `block`緩存使用的記憶體空間要使用`malloc`動態分配
 3. trace資料夾包括要所有要讀取的`.trace`文件
 4. 可以調用`cachelab.c/.h`中的helper function，例如`printfSummary()`
 
@@ -93,8 +73,6 @@ Lab文件說得很清楚:
 我們把整個程式粗略分成5個區塊:
 
 ![image-20221029161404919](https://raw.githubusercontent.com/WeiLin66/pictures/main/image-20221029161404919.png)
-
-附上Github上完整的code: [csim.c](https://github.com/WeiLin66/CMU-15-213/blob/main/Labs/cache-lab/csim.c)
 
 #### 讀取輸入參數
 
@@ -322,7 +300,7 @@ static void cmd_parsing(char* filename){
 
 ##### LRU
 
-使用cacheLine的變數`timeStamp`判斷哪個行距離現在使用最久遠，因為每次操作時都會更新時間週期`ticks`(加一)，這代表`timeStamp`越小，距離現在越久
+使用cacheLine的變數`timeStamp`判斷哪個行距離現在使用最久遠，因為每次操作時都會更新時間週期`ticks`(+1)，這代表`timeStamp`越小，距離現在越久
 
 所以我們只需要掃描一遍某組中的所有行就可找出要替換的行
 
@@ -387,9 +365,9 @@ Lab文件有提到miss的範圍與得分佔比，例如64 * 64的矩陣測試結
 ### 實驗須知
 
 1. 我們需要在`trans.c`中編寫並測試轉移函式
-2. 轉移函式中**最多只能使用12個**``int`類型的局部變數，若轉移函式中調用其他函式，也要將該函式中的局部變數考慮進去
+2. 轉移函式中**最多只能使用12個**`int`類型的局部變數，若轉移函式中調用其他函式，也要將該函式中的局部變數考慮進去
 3. 不能使用位運算在一個整型變數存放多個值
-4. 不允許使用``long`類型局部變數
+4. 不允許使用`long`類型局部變數
 5. `transpose_submit(int M, int N, int A[N][M], int B[M][N])`中陣列參數只允許修改B
 6. 轉移函式中不允許宣告陣列變數或使用`malloc`
 
@@ -521,7 +499,7 @@ int multi(int A[8][8], int B[8][8]){
 
 - 讀取矩陣B的b0, b8, b16, b24，並將前4列數據加載進緩存中
 - 下一次循環對b1, b9, b17, b25操作均不會發生miss，因為數據已經在緩存了
-- 因此每個塊會發生4次miss，總共4塊，所以miss數為4*4 = 16
+- 因此每個塊會發生4次miss，總共4塊，所以miss數為4 * 4 = 16
 
 > 總miss數為8 + 16 = 24次miss
 
@@ -540,11 +518,11 @@ int multi(int A[8][8], int B[8][8]){
 - 假設緩存大小為(s=5, E=1, b=5)，32組、1行、每行32bytes
 - 緩存大小為1024bytes，可以容納256個`int`類型整數
 
-#### 32*32
+#### 32 * 32
 
 - 由於一列有32個整數，所以8列可以剛好填滿緩存
 
-- 使用大小為8*8的塊(8代表8個整數大小)
+- 使用大小為8 * 8的塊(8代表8個整數大小)
 
 ```C
 /* 
@@ -554,12 +532,13 @@ char trans_desc32[] = "Simple transpose func32";
 void trans32(int M, int N, int A[N][M], int B[M][N]){ 
 
     int i, j, i1;
-
+	
+    /* 循環遍歷每個塊 */
     for (i = 0; i < M; i += 8) {
 
         for (j = 0; j < N; j += 8) {
             
-            /* B * B mini block */
+            /* 對每個小塊進行數據轉移處理 */
             for(i1=i; i1<i+8; i1++) {
 
                 int temp_0 = A[i1][j];
@@ -587,7 +566,34 @@ void trans32(int M, int N, int A[N][M], int B[M][N]){
 
 
 
-#### 64*64
+#### 64 * 64
+
+- 由於一列具有64個整數，所以緩存空間只能容納4列(64  * 4  * 4 =1024 )，所以使用8\*8塊方法不適用
+- 另一個方法是將塊大小縮減成4 * 4，但此方法會使miss數稍微超過1300，不是最佳解
+
+* 為了能最有效率使用塊，同時又不發生多餘`eviction`，需要特殊處理
+
+例如下圖我們假設一個塊大小為8 * 8，每個塊可以細分成4個子塊，每個子塊大小為4 * 4
+
+> 舉例來說，若我們同時處理A1以及A3，就會發生`eviction`，因為每過4列就會重頭將緩存更新一遍，因此為了避免這種場景發生，**我們都需要確保在緩存發生`eviction`替換前，被替換數據已盡量完成操作**
+
+塊內的操作可以分成以下步驟:
+
+- 步驟一
+  - 將A1, A2數據複製給B1, B2
+    - A1, A2加載進緩存中
+    - B1, B2加載進緩存中
+- 步驟二
+  - 將B2的內容先暫存再複製給B3；同時將A3複製給B2
+    - 塊A3, A4加載進緩存，覆蓋掉原先的數據A1, A2
+    - 該步驟是塊B主要的`miss`以及`eviction`來源
+      - 每次循環會先將B2數據讀出，在加載A3的數據，這次使用的是緩存中存放的是B1, B2
+      - 將A3複製給B2的操作由於當前緩存存放的事B1, B2因次會發生`miss`以及`eviction`(每列皆發生一次)
+      - 下次循環中將B2數據讀出，在加載A3的數據這個操作，每列又會發生一次`miss`以及`eviction`(因為緩存現在存放的數據變成B3, B4)
+- 步驟三
+  - 將A4複製給B4
+
+![blocking6464](https://raw.githubusercontent.com/WeiLin66/pictures/main/202211052108096.png)
 
 ```C
 /* 
@@ -599,10 +605,10 @@ void trans64(int M, int N, int A[N][M], int B[M][N]){
     int i, j, k;
     int temp_0, temp_1, temp_2, temp_3, temp_4, temp_5, temp_6, temp_7;
 
+    /* 循環遍歷每個塊 */
     for (i = 0; i < N; i += 8) {
 
         for (j = 0; j < M; j += 8) {
-
 
             /* A1, A2 --> B1, B2 */
             for (k = 0; k < 4; k++) {
@@ -673,7 +679,16 @@ void trans64(int M, int N, int A[N][M], int B[M][N]){
 
 
 
-#### 61*67
+#### 61 * 67
+
+- 方法一(推薦): 切分成兩塊
+
+![image-20221105220129112](https://raw.githubusercontent.com/WeiLin66/pictures/main/202211052201973.png)
+
+- 先處理61 *64陣列
+  - 由於長度不是8的倍數且具有基數，所以無法使用Blocking
+  - 退而求其次，每8個元素轉移
+- 再處理剩餘的64 * 3矩陣，手法相同
 
 ```C
 /* 
@@ -685,7 +700,7 @@ void trans6167(int M, int N, int A[N][M], int B[M][N]){
     int i, j;
     int tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8;
 
-    /* 56 * 67 */
+    /* 61 * 64 */
     for (i = 0; i < (M/8)*8; i += 8) {
 
         for (j = 0; j < N; i++) {
@@ -710,7 +725,7 @@ void trans6167(int M, int N, int A[N][M], int B[M][N]){
         }
     }
 
-    /* transpose rest elements */
+    /* 轉移剩餘的區塊 */
     for (i = 0; i < N; i++) {
 
         for (j = (M/8)*8; j < M; j++) {
@@ -722,5 +737,157 @@ void trans6167(int M, int N, int A[N][M], int B[M][N]){
 }
 ```
 
+- 方法二: 切分成4塊
+
+![image-20221105215719983](https://raw.githubusercontent.com/WeiLin66/pictures/main/202211052157944.png)
+
+- 對56 * 64塊做4 * 8的Blocking操作(請見64 * 64)
+- 左下的塊每8個整數轉移
+- 剩餘的塊使用簡單的賦值處理
+
+```c
+/* 
+ * trans61*67
+ */
+char trans_desc6167[] = "Simple transpose func6167";
+void trans6167(int M, int N, int A[N][M], int B[M][N]){
+
+    int i, j, k;
+    int temp_0, temp_1, temp_2, temp_3, temp_4, temp_5, temp_6, temp_7;
+
+    /* 64 * 56 */
+    for (i = 0; i < 64; i += 8) {
+
+        for (j = 0; j < 56; j += 8) {
+
+            /* A1, A2 --> B1, B2 */
+            for (k = 0; k < 4; k++) {
+
+                temp_0 = A[i + k][j];
+                temp_1 = A[i + k][j + 1];
+                temp_2 = A[i + k][j + 2];
+                temp_3 = A[i + k][j + 3];
+                temp_4 = A[i + k][j + 4];
+                temp_5 = A[i + k][j + 5];
+                temp_6 = A[i + k][j + 6];
+                temp_7 = A[i + k][j + 7];
+
+                B[j][i + k] = temp_0;
+                B[j + 1][i + k] = temp_1;
+                B[j + 2][i + k] = temp_2;
+                B[j + 3][i + k] = temp_3;
+
+                B[j][i + k + 4] = temp_4;
+                B[j + 1][i + k + 4] = temp_5;
+                B[j + 2][i + k + 4] = temp_6;
+                B[j + 3][i + k + 4] = temp_7;
+            }
+
+            /* B2 --> B3, A3 --> B2 */
+            for (k = 0; k < 4; k++) {
+
+                temp_0 = A[i + 4][j + k];
+                temp_1 = A[i + 5][j + k];
+                temp_2 = A[i + 6][j + k];
+                temp_3 = A[i + 7][j + k];
+
+                temp_4 = B[j + k][i + 4];
+                temp_5 = B[j + k][i + 5];
+                temp_6 = B[j + k][i + 6];
+                temp_7 = B[j + k][i + 7];
+
+                B[j + k][i + 4] = temp_0;
+                B[j + k][i + 5] = temp_1;
+                B[j + k][i + 6] = temp_2;
+                B[j + k][i + 7] = temp_3;
+
+                B[j + k + 4][i] = temp_4;
+                B[j + k + 4][i + 1] = temp_5;
+                B[j + k + 4][i + 2] = temp_6;
+                B[j + k + 4][i + 3] = temp_7;
+
+            }
+
+            /* A4 --> B4 */
+            for (k = 4; k < 8; k++) {
+
+                temp_0 = A[i + k][j + 4];
+                temp_1 = A[i + k][j + 5];
+                temp_2 = A[i + k][j + 6];
+                temp_3 = A[i + k][j + 7];
+
+                B[j + 4][i + k] = temp_0;
+                B[j + 5][i + k] = temp_1;
+                B[j + 6][i + k] = temp_2;
+                B[j + 7][i + k] = temp_3;
+            }
+        }
+
+        /* top right */
+        for(j = 56; j < M; j++){
+
+            temp_0 = A[i][j];
+            temp_1 = A[i+1][j];
+            temp_2 = A[i+2][j];
+            temp_3 = A[i+3][j];
+            temp_4 = A[i+4][j];
+            temp_5 = A[i+5][j];
+            temp_6 = A[i+6][j];
+            temp_7 = A[i+7][j];
+
+            B[j][i] = temp_0;
+            B[j][i+1] = temp_1;
+            B[j][i+2] = temp_2;
+            B[j][i+3] = temp_3;
+            B[j][i+4] = temp_4;
+            B[j][i+5] = temp_5;
+            B[j][i+6] = temp_6;
+            B[j][i+7] = temp_7;
+        }
+
+    }  
+
+    /* buttom left */
+    for (i = 64; i < 67; i++) {
+
+        for (j = 0; j < 56; j += 8) {
+
+            temp_0 = A[i][j];
+            temp_1 = A[i][j + 1];
+            temp_2 = A[i][j + 2];
+            temp_3 = A[i][j + 3];
+            temp_4 = A[i][j + 4];
+            temp_5 = A[i][j + 5];
+            temp_6 = A[i][j + 6];
+            temp_7 = A[i][j + 7];
+
+            B[j][i] = temp_0;
+            B[j + 1][i] = temp_1;
+            B[j + 2][i] = temp_2;
+            B[j + 3][i] = temp_3;
+            B[j + 4][i] = temp_4;
+            B[j + 5][i] = temp_5;
+            B[j + 6][i] = temp_6;
+            B[j + 7][i] = temp_7;
+        }
+    }
+
+    /* buttom right */
+     for (i = 56; i < 61; i++) {
+
+        temp_0 = A[64][i];
+        temp_1 = A[65][i];
+        temp_2 = A[66][i];
+
+        B[i][64] = temp_0;
+        B[i][65] = temp_1;
+        B[i][66] = temp_2;
+    }
+}
+```
 
 
+
+## 資源
+
+https://github.com/WeiLin66/CMU-15-213/tree/main/Labs/cache-lab

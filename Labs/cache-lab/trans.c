@@ -306,7 +306,7 @@ void trans6167(int M, int N, int A[N][M], int B[M][N]){
     /* 56 * 67 */
     for (i = 0; i < (M/8)*8; i += 8) {
 
-        for (j = 0; j < N; i++) {
+        for (j = 0; j < N; j++) {
 
             tmp1 = A[j][i];
             tmp2 = A[j][i + 1];

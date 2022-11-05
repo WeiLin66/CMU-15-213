@@ -2,7 +2,7 @@
 
 ## 實驗環境搭建
 
-| *建議使用Ubuntu作業系統或其他Linux distros*
+> *建議使用Ubuntu作業系統或其他Linux distros*
 
 1. 首先從Github拉取該repo
 2. 複製Lab_Backup中的Lab檔
@@ -277,3 +277,6 @@ unsigned floatPower2(int x) {
 }
 ```
 
+## 資源
+
+https://github.com/WeiLin66/CMU-15-213/tree/main/Labs/data-lab
