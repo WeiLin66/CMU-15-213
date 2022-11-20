@@ -9,21 +9,19 @@
 | ------------- | -------------------------------------------- |
 | Labs        | 章節末的實驗解答                           |
 | Labs_Backup | 初始的Lab                                  |
-| *homeworks  | 包含各個章節的回家作業解答(TBD)           |
+| homeworks  | 包含各個章節的回家作業解答(TBD)           |
 | resources   | 上課講義與教科書                           |
+| code | 官方提供的範例程式 |
 
-## log
+## Lab進度
 
-* [x] 講義整理
-* [X] labs
-
-  * [X] **Data Lab**
-  * [x] **Bomb Lab**
-  * [x] **Attack Lab**
-  * [x] **Cache Lab**
-  * [ ] **Shell Lab**
-  * [ ] **Malloc Lab**
-  * [ ] **Proxy Lab**
+* [X] **Data Lab**
+* [x] **Bomb Lab**
+* [x] **Attack Lab**
+* [x] **Cache Lab**
+* [x] **Shell Lab**
+* [ ] **Malloc Lab**
+* [ ] **Proxy Lab**
 
 ## 聯絡我
 
