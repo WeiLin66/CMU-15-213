@@ -4,6 +4,10 @@
         "file.h": "c",
         "struct_file.h": "c",
         "__file.h": "c",
-        "fcntl.h": "c"
+        "fcntl.h": "c",
+        "csapp.h": "c",
+        "stat.h": "c",
+        "unistd.h": "c",
+        "cstdio": "c"
     }
 }

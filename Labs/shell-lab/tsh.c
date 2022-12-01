@@ -139,15 +139,18 @@ int main(int argc, char **argv) {
 
     	/* Read command line */
     	if (emit_prompt) {
+
     	    printf("%s", prompt);
     	    fflush(stdout);
     	}
 
     	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin)){
+
     	    app_error("fgets error");
         }
 
     	if (feof(stdin)) { /* End of file (ctrl-d) */
+
     	    fflush(stdout);
     	    exit(0);
     	}
@@ -216,7 +219,9 @@ int parseline(const char *cmdline, char **argv) {
     	argv[argc++] = buf;
     	*delim = '\0';
     	buf = delim + 1;
+
     	while (*buf && (*buf == ' ')){ /* ignore spaces */
+
 	       buf++;
         }
 
@@ -337,13 +342,17 @@ void initjobs(struct job_t *jobs) {
 }
 
 /* maxjid - Returns largest allocated job ID */
-int maxjid(struct job_t *jobs) 
-{
+int maxjid(struct job_t *jobs) {
+
     int i, max=0;
 
-    for (i = 0; i < MAXJOBS; i++)
-	if (jobs[i].jid > max)
-	    max = jobs[i].jid;
+    for (i = 0; i < MAXJOBS; i++){
+    
+        if (jobs[i].jid > max){
+         
+            max = jobs[i].jid;
+        }
+    }
     return max;
 }
 
@@ -382,6 +391,7 @@ int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline) {
     }
 
     printf("Tried to create too many jobs\n");
+    
     return 0;
 }
 

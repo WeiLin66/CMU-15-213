@@ -874,18 +874,19 @@ ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen)
 
     for (n = 1; n < maxlen; n++) { 
         if ((rc = rio_read(rp, &c, 1)) == 1) {
-    	    *bufp++ = c;
-    	    if (c == '\n') {
+            *bufp++ = c;
+            if (c == '\n') {
                 n++;
-         		break;
+                break;
             }
-	} else if (rc == 0) {
-	    if (n == 1)
-		    return 0; /* EOF, no data read */
-	    else
-		    break;    /* EOF, some data was read */
-	} else
-	    return -1;	  /* Error */
+        } else if (rc == 0) {
+            if (n == 1)
+                return 0; /* EOF, no data read */
+            else
+                break;    /* EOF, some data was read */
+        }   
+        else
+            return -1;	  /* Error */
     }
     *bufp = 0;  /* NULL */
     return n-1;
@@ -900,14 +901,14 @@ ssize_t Rio_readn(int fd, void *ptr, size_t nbytes)
     ssize_t n;
   
     if ((n = rio_readn(fd, ptr, nbytes)) < 0)
-	unix_error("Rio_readn error");
+	    unix_error("Rio_readn error");
     return n;
 }
 
 void Rio_writen(int fd, void *usrbuf, size_t n) 
 {
     if (rio_writen(fd, usrbuf, n) != n)
-	unix_error("Rio_writen error");
+	    unix_error("Rio_writen error");
 }
 
 void Rio_readinitb(rio_t *rp, int fd)
@@ -920,7 +921,7 @@ ssize_t Rio_readnb(rio_t *rp, void *usrbuf, size_t n)
     ssize_t rc;
 
     if ((rc = rio_readnb(rp, usrbuf, n)) < 0)
-	unix_error("Rio_readnb error");
+	    unix_error("Rio_readnb error");
     return rc;
 }
 
@@ -929,7 +930,7 @@ ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen)
     ssize_t rc;
 
     if ((rc = rio_readlineb(rp, usrbuf, maxlen)) < 0)
-	unix_error("Rio_readlineb error");
+	    unix_error("Rio_readlineb error");
     return rc;
 } 
 
