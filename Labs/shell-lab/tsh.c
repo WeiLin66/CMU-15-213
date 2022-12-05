@@ -177,6 +177,46 @@ int main(int argc, char **argv) {
 */
 void eval(char *cmdline) {
 
+    char *argv[MAXARGS] = {0};
+    char buffer[MAXLINE] = {0};
+    int bg;
+    pid_t pid;
+
+    strncpy(buffer, cmdline, strlen(cmdline));
+    bg = parseline(buffer, argv);
+
+    /* empty command */
+    if(argv[0] == NULL){
+
+        return;
+    }
+
+    if(!builtin_cmd(argv)){
+
+        /* might have race condition here! */
+        if((pid = Fork()) == 0){
+
+            if(execve(argv[0], argv, environ) < 0){
+
+                printf("%s: Command not found.\n", argv[0]);
+                exit(0);
+            }
+
+            if(!bg){
+
+                int status;
+
+                if(waitpid(pid, &status, 0) < 0){
+
+                    unix_error("waitfg: waitpid error");
+                }else{
+
+                    printf("%d %s", pid, cmdline);
+                }
+            }
+        }
+    }
+
     return;
 }
 
@@ -207,32 +247,32 @@ int parseline(const char *cmdline, char **argv) {
     argc = 0;
     if (*buf == '\'') {
 
-    	buf++;
-    	delim = strchr(buf, '\'');
+        buf++;
+        delim = strchr(buf, '\'');
     }else {
 
-	   delim = strchr(buf, ' ');
+        delim = strchr(buf, ' ');
     }
 
     while (delim) {
 
-    	argv[argc++] = buf;
-    	*delim = '\0';
-    	buf = delim + 1;
+        argv[argc++] = buf;
+        *delim = '\0';
+        buf = delim + 1;
 
-    	while (*buf && (*buf == ' ')){ /* ignore spaces */
+        while (*buf && (*buf == ' ')){ /* ignore spaces */
 
-	       buf++;
+            buf++;
         }
 
-    	if (*buf == '\'') {
-    	    
+        if (*buf == '\'') {
+            
             buf++;
-    	    delim = strchr(buf, '\'');
-    	}else {
-    	    
+            delim = strchr(buf, '\'');
+        }else {
+            
             delim = strchr(buf, ' ');
-    	}
+        }
     }
 
     argv[argc] = NULL;
@@ -257,6 +297,35 @@ int parseline(const char *cmdline, char **argv) {
  */
 int builtin_cmd(char **argv) {
 
+    pid_t pid = 0;
+    int status = 0;
+
+    if(!strcmp(argv[0], "quit")){
+
+        exit(0);
+    }else if(!strcmp(argv[0], "jobs")){
+
+        listjobs(jobs); // temp
+        return 1;
+    }else if(!strcmp(argv[0], "bg")){
+
+        /* SIGCONT & background */
+        kill(argv[1], SIGCONT);
+        return 1;
+    }else if(!strcmp(argv[0], "fg")){
+
+        /* SIGCONT & frontground */
+        kill(argv[1], SIGCONT);
+
+        /* wait until it ends */
+        if(waitpid(pid, &status, 0) < 0){
+
+            unix_error("waitfg: waitpid error");
+        }
+
+        return 1;
+    }
+
     return 0;     /* not a builtin command */
 }
 
@@ -265,6 +334,7 @@ int builtin_cmd(char **argv) {
  */
 void do_bgfg(char **argv) {
 
+    /* how can we know the job is running in bg? cuz & has been deleted */
     return;
 }
 
