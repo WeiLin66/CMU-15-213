@@ -372,6 +372,9 @@ void sigchld_handler(int sig) {
 
     sigfillset(&mask);
 
+    /* prevent handler being interrupted by other signal */
+    Sigprocmask(SIG_BLOCK, &mask, &prev);
+
     /**
      * @brief waitpid option could be
      * 0: block waiting
@@ -381,9 +384,6 @@ void sigchld_handler(int sig) {
      */
     /* wait for all zombies */
     while((pid = Waidpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
-
-        /* prevent handler being interrupted by other signal */
-        Sigprocmask(SIG_BLOCK, &mask, &prev);
 
         if(WIFEXITED(stat)){
 
@@ -410,17 +410,17 @@ void sigchld_handler(int sig) {
 
             struct job_t* target = getjobpid(jobs, pid);
             target->state = ST;
-        }else{
+        }else if(WIFCONTINUED(stat)){
 
             #if (DEBUG_LOG)
-            Sio_error("watpid unstated\n");
+            Sio_error("child JID: %lu, PID: %lu is resumed by signal SIGCONT\n", 
+                       pid2jid(pid), pid);
             #endif
         }
-
-        /* un-block */
-        Sigprocmask(SIG_SETMASK, &prev, NULL);
-
     }
+
+    /* unblock all signals */
+    Sigprocmask(SIG_SETMASK, &prev, NULL);
 
     /* quit waitpid successfully? */
     if(errno != ECHILD){
