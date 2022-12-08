@@ -19,6 +19,10 @@
 #define MAXJOBS    16           /* max jobs at any point in time */
 #define MAXJID     1 << 16      /* max job ID */
 
+#define DEBUG_ON    1
+#define DEBUG_OFF   0
+#define DEBUG_LOG   DEBUG_OFF
+
 /* Job states */
 #define UNDEF   0    /* undefined */
 #define FG      1    /* running in foreground */
@@ -358,8 +362,74 @@ void waitfg(pid_t pid){
  *     available zombie children, but doesn't wait for any other
  *     currently running children to terminate.  
  */
-void sigchld_handler(int sig) 
-{
+void sigchld_handler(int sig) {
+
+    sigset_t mask, prev;
+
+    int stat, olderr = errno; // save original errno
+
+    pid_t pid;
+
+    sigfillset(&mask);
+
+    /**
+     * @brief waitpid option could be
+     * 0: block waiting
+     * WNOHANG: return immediately if no child has exited.
+     * WUNTRACED: return if a child has stopped
+     * WCONTINUED: return if a stopped child has been resumed by delivery of SIGCONT
+     */
+    /* wait for all zombies */
+    while((pid = Waidpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
+
+        /* prevent handler being interrupted by other signal */
+        Sigprocmask(SIG_BLOCK, &mask, &prev);
+
+        if(WIFEXITED(stat)){
+
+            #if (DEBUG_LOG)
+            Sio_error("child %lu is terminated normally\n", pid);
+            #endif
+
+            /* delete child process */
+            deletejob(jobs, pid);
+        }else if(WIFSIGNALED(stat)){
+
+            #if (DEBUG_LOG)
+            Sio_error("child %lu is terminated by signal\n", pid);
+            #endif
+
+            /* child proces is terminated by signal */
+            deletejob(jobs, pid);
+        }else if(WIFSTOPPED(stat)){
+
+            #if (DEBUG_LOG)
+            Sio_error("child JID: %lu, PID: %lu is stopped by signal %lu\n", 
+                       pid2jid(pid), pid, WSTOPSIG(stat));
+            #endif
+
+            struct job_t* target = getjobpid(jobs, pid);
+            target->state = ST;
+        }else{
+
+            #if (DEBUG_LOG)
+            Sio_error("watpid unstated\n");
+            #endif
+        }
+
+        /* un-block */
+        Sigprocmask(SIG_SETMASK, &prev, NULL);
+
+    }
+
+    /* quit waitpid successfully? */
+    if(errno != ECHILD){
+
+        Sio_error("waitpid error\n");
+    }
+
+    errno = olderr; // restore erron
+    
     return;
 }
 
@@ -370,6 +440,15 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) {
 
+    pid_t pid = fgpid(jobs);
+
+    if(pid == 0){
+
+        return ;
+    }
+
+    Kill(-pid, SIGINT); // close front ground process group 
+
     return;
 }
 
@@ -379,6 +458,14 @@ void sigint_handler(int sig) {
  *     foreground job by sending it a SIGTSTP.  
  */
 void sigtstp_handler(int sig) {
+    pid_t pid = fgpid(jobs);
+
+    if(pid == 0){
+
+        return ;
+    }
+
+    Kill(-pid, SIGSTOP); // close front ground process group 
 
     return;
 }
