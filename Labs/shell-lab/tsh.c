@@ -82,6 +82,7 @@ pid_t fgpid(struct job_t *jobs);
 struct job_t *getjobpid(struct job_t *jobs, pid_t pid);
 struct job_t *getjobjid(struct job_t *jobs, int jid); 
 int pid2jid(pid_t pid); 
+void listbgjobs(struct job_t* jobs); // add by Zach
 void listjobs(struct job_t *jobs);
 
 void usage(void);
@@ -301,36 +302,37 @@ int parseline(const char *cmdline, char **argv) {
  */
 int builtin_cmd(char **argv) {
 
-    pid_t pid = 0;
-    int status = 0;
+    int ret = 1;
 
+    /* quit the shell process */
     if(!strcmp(argv[0], "quit")){
 
         exit(0);
-    }else if(!strcmp(argv[0], "jobs")){
+    }
+    /* lists all background jobs */
+    else if(!strcmp(argv[0], "jobs")){
 
-        listjobs(jobs); // temp
-        return 1;
-    }else if(!strcmp(argv[0], "bg")){
+        listjobs(jobs);
+    }
+    /* restarts job by sending it a SIGCONT signal, and then runs it in the
+       background. The job argument can be either a PID or a JID. */
+    else if(!strcmp(argv[0], "bg")){
 
-        /* SIGCONT & background */
-        kill(argv[1], SIGCONT);
-        return 1;
-    }else if(!strcmp(argv[0], "fg")){
+        do_bgfg(argv);
+    }
+    /* restarts job by sending it a SIGCONT signal, and then runs it in the
+       foreground. The job argument can be either a PID or a JID. */
+    else if(!strcmp(argv[0], "fg")){
 
-        /* SIGCONT & frontground */
-        kill(argv[1], SIGCONT);
+        do_bgfg(argv);
+    }
+     /* not a builtin command */
+    else{
 
-        /* wait until it ends */
-        if(waitpid(pid, &status, 0) < 0){
-
-            unix_error("waitfg: waitpid error");
-        }
-
-        return 1;
+        ret = 0;
     }
 
-    return 0;     /* not a builtin command */
+    return ret;    
 }
 
 /* 
@@ -338,8 +340,40 @@ int builtin_cmd(char **argv) {
  */
 void do_bgfg(char **argv) {
 
-    /* how can we know the job is running in bg? cuz & has been deleted */
-    return;
+    int target_pid;
+    u_int8_t fgbg = 1; // 1 for front ground 0 for back ground
+
+    fgbg = strcmp(argv[0], "fg") == 0;
+    target_pid = atoi(argv[1]); // get pid from command line
+
+    struct job_t* job_jid_ptr = getjobjid(jobs, target_pid);
+
+    if(job_jid_ptr != NULL && job_jid_ptr->state == ST){
+
+        #if (DEBUG_LOG)
+            printf("process jid: %u is currently in ST mode!\n");
+        #endif
+
+        Kill(-target_pid, SIGCONT); // send signal SIGCONT to process group jid
+
+        // does this function need to deal with addjob and deletejob?
+
+        if(fgbg){
+
+            waitfg(target_pid);
+        }else{
+
+            #if (DEBUG_LOG)
+                printf("Turn process jid: %u into a background job!\n", target_pid);
+            #endif
+        }
+    }else{
+
+        #if (DEBUG_LOG)
+            printf("process jid: %u is not found or is not in the ST mode!\n");
+        #endif
+    }
+
 }
 
 /* 
@@ -347,8 +381,18 @@ void do_bgfg(char **argv) {
  */
 void waitfg(pid_t pid){
 
-    // do a spin?
-    return;
+    pid_t pid;
+    int olderr = errno;
+
+    /* do a spin */
+    while((pid = Wait(pid)) > 0);
+
+    if(errno != ECHILD){
+
+        Sio_error("waitpid error\n");
+    }
+
+    errno = olderr;
 }
 
 /*****************
@@ -383,7 +427,7 @@ void sigchld_handler(int sig) {
      * WCONTINUED: return if a stopped child has been resumed by delivery of SIGCONT
      */
     /* wait for all zombies */
-    while((pid = Waidpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
+    while((pid = Waitpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
 
         if(WIFEXITED(stat)){
 
@@ -458,6 +502,7 @@ void sigint_handler(int sig) {
  *     foreground job by sending it a SIGTSTP.  
  */
 void sigtstp_handler(int sig) {
+
     pid_t pid = fgpid(jobs);
 
     if(pid == 0){
@@ -615,7 +660,7 @@ struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {
 }
 
 /* getjobjid  - Find a job (by JID) on the job list */
-struct job_t *getjobjid(struct job_t *jobs, int jid) {
+struct job_t *getjobJid(struct job_t *jobs, int jid) {
 
     int i;
 
@@ -654,6 +699,31 @@ int pid2jid(pid_t pid) {
     }
 
     return 0;
+}
+
+void listbgjobs(struct job_t* jobs){
+
+    if(jobs == NULL){
+
+        return;
+    }
+
+    int i;
+
+    for(int i=0; i<MAXJOBS; i++){
+
+        if(jobs[i].pid <= 0){
+
+            continue;
+        }
+
+        if(jobs[i].state != BG){
+
+            continue;
+        }
+
+       printf("[%d] (%d) ", jobs[i].jid, jobs[i].pid);
+    }
 }
 
 /* listjobs - Print the job list */
