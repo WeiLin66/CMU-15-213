@@ -20,3 +20,25 @@ Files:
 - `mystop.c ` &rarr; Spins for <n> seconds and sends SIGTSTP to itself
 - `myint.c` &rarr; Spins for <n> seconds and sends SIGINT to itself
 
+### 整體結構
+
+
+
+### 目標編寫函式
+
+
+
+### 注意事項
+
+
+
+### 程式碼實現
+
+
+
+### 驗證
+
+
+
+
+
