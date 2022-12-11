@@ -46,6 +46,12 @@ int verbose = 0;            /* if true, print additional output */
 int nextjid = 1;            /* next job ID to allocate */
 char sbuf[MAXLINE];         /* for composing sprintf messages */
 
+typedef enum{
+    FRONT_GROUND = 0,
+    BACK_GROUND = 1,
+    UNKNOWED = 2
+}Job_Status;
+
 struct job_t {              /* The job struct */
     pid_t pid;              /* job PID */
     int jid;                /* job ID [1, 2, ...] */
@@ -182,6 +188,11 @@ int main(int argc, char **argv) {
 */
 void eval(char *cmdline) {
 
+    if(cmdline == NULL){
+
+        return;
+    }
+
     char *argv[MAXARGS] = {0};
     char buffer[MAXLINE] = {0};
     int bg;
@@ -207,11 +218,12 @@ void eval(char *cmdline) {
                 exit(0);
             }
 
+            /* wait for front ground job */
             if(!bg){
 
                 int status;
 
-                if(waitpid(pid, &status, 0) < 0){
+                if(Waitpid(pid, &status, 0) < 0){
 
                     unix_error("waitfg: waitpid error");
                 }else{
@@ -233,6 +245,11 @@ void eval(char *cmdline) {
  * the user has requested a FG job.  
  */
 int parseline(const char *cmdline, char **argv) {
+
+    if(cmdline == NULL || argv == NULL){
+
+        return;
+    }
 
     static char array[MAXLINE]; /* holds local copy of command line */
     char *buf = array;          /* ptr that traverses command line */
@@ -297,10 +314,16 @@ int parseline(const char *cmdline, char **argv) {
 }
 
 /* 
- * builtin_cmd - If the user has typed a built-in command then execute
- *    it immediately.  
+ * builtin_cmd - If the user has typed a built-in command then execute it immediately.
+ * 
+ * notice that fg/bg %5 denotes jid 5 wheara fg/bg 5 denotes pid 5  
  */
 int builtin_cmd(char **argv) {
+
+    if(argv == NULL){
+
+        return;
+    }
 
     int ret = 1;
 
@@ -340,13 +363,29 @@ int builtin_cmd(char **argv) {
  */
 void do_bgfg(char **argv) {
 
-    int target_pid;
-    u_int8_t fgbg = 1; // 1 for front ground 0 for back ground
+    if(argv == NULL){
 
-    fgbg = strcmp(argv[0], "fg") == 0;
-    target_pid = atoi(argv[1]); // get pid from command line
+        return;
+    }
 
-    struct job_t* job_jid_ptr = getjobjid(jobs, target_pid);
+    int target_jid;
+    pid_t target_pid;
+    u_int8_t fgbg = 1;
+    struct job_t* job_jid_ptr;
+
+    fgbg = strcmp(argv[0], "bg") == 0; // 0 for front ground 1 for back ground
+
+    /* argument is jid */
+    if(argv[0][0] == '%'){
+
+        target_jid = atoi(argv[0][1]);
+        job_jid_ptr = getjobjid(jobs, target_jid);
+    }
+    /* argument is pid */
+    else{
+        target_pid = atoi(argv[0][0]);
+        job_jid_ptr = getjobpid(jobs, target_pid);
+    }
 
     if(job_jid_ptr != NULL && job_jid_ptr->state == ST){
 
@@ -356,16 +395,26 @@ void do_bgfg(char **argv) {
 
         Kill(-target_pid, SIGCONT); // send signal SIGCONT to process group jid
 
-        // does this function need to deal with addjob and deletejob?
+        switch (fgbg){
 
-        if(fgbg){
+            /* turn into fg and conduct a Wait() */
+            case FRONT_GROUND:
+                job_jid_ptr->state = FG;
+                for(; Waitpid(target_pid, NULL, -1); );
+            break;
 
-            waitfg(target_pid);
-        }else{
+            /* turn into bg */
+            case BACK_GROUND:
+                job_jid_ptr->state = BG;
+                waitfg(target_pid);
+            break;
 
-            #if (DEBUG_LOG)
-                printf("Turn process jid: %u into a background job!\n", target_pid);
-            #endif
+            case UNKNOWED:
+                #if (DEBUG_LOG)
+                    printf("fatal errror! fgbg is neither 0 nor 1\n");
+                #endif
+                exit(1);
+            break;
         }
     }else{
 
@@ -381,18 +430,21 @@ void do_bgfg(char **argv) {
  */
 void waitfg(pid_t pid){
 
-    pid_t pid;
-    int olderr = errno;
-
-    /* do a spin */
-    while((pid = Wait(pid)) > 0);
-
-    if(errno != ECHILD){
-
-        Sio_error("waitpid error\n");
+    if(pid <= 0){
+        
+        return;
     }
 
-    errno = olderr;
+    struct job_t* fg = getjobpid(jobs, pid);
+
+    if(fg == NULL){
+
+        return;
+    }
+
+    /* wait until current job pid is not a front ground job anymore */
+    for(; fgpid(fg) != 0; );
+
 }
 
 /*****************
