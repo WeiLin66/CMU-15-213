@@ -197,6 +197,11 @@ void eval(char *cmdline) {
     char buffer[MAXLINE] = {0};
     int bg;
     pid_t pid;
+    sigset_t mask_all, mask_one, prev_one;
+
+    sigfillset(&mask_all);
+    sigemptyset(&mask_one);
+    sigaddset(&mask_one, SIGCHLD);
 
     strncpy(buffer, cmdline, strlen(cmdline));
     bg = parseline(buffer, argv);
@@ -209,27 +214,36 @@ void eval(char *cmdline) {
 
     if(!builtin_cmd(argv)){
 
-        /* might have race condition here! */
+        /* avoid race condition here */
+        Sigprocmask(SIG_BLOCK, &mask_one, &prev_one);
+
         if((pid = Fork()) == 0){
+
+            Sigprocmask(SIG_SETMASK, &prev_one); // unblock SIGCHLD
 
             if(execve(argv[0], argv, environ) < 0){
 
                 printf("%s: Command not found.\n", argv[0]);
                 exit(0);
             }
+        }
 
-            /* wait for front ground job */
-            if(!bg){
+        /* add job */
+        Sigprocmask(SIG_BLOCK, &mask_all, NULL);
+        addjob(jobs, pid, (bg ? BG : FG), buffer);
+        Sigprocmask(SIG_SETMASK, &prev_one, NULL);
 
-                int status;
+        /* wait for front ground job */
+        if(!bg){
 
-                if(Waitpid(pid, &status, 0) < 0){
+            int status;
 
-                    unix_error("waitfg: waitpid error");
-                }else{
+            if(Waitpid(pid, &status, 0) < 0){
 
-                    printf("%d %s", pid, cmdline);
-                }
+                unix_error("waitfg: waitpid error");
+            }else{
+
+                printf("%d %s", pid, cmdline);
             }
         }
     }
@@ -315,8 +329,6 @@ int parseline(const char *cmdline, char **argv) {
 
 /* 
  * builtin_cmd - If the user has typed a built-in command then execute it immediately.
- * 
- * notice that fg/bg %5 denotes jid 5 wheara fg/bg 5 denotes pid 5  
  */
 int builtin_cmd(char **argv) {
 
@@ -335,7 +347,7 @@ int builtin_cmd(char **argv) {
     /* lists all background jobs */
     else if(!strcmp(argv[0], "jobs")){
 
-        listjobs(jobs);
+        listbgjobs(jobs); // list only back ground job
     }
     /* restarts job by sending it a SIGCONT signal, and then runs it in the
        background. The job argument can be either a PID or a JID. */
@@ -349,7 +361,7 @@ int builtin_cmd(char **argv) {
 
         do_bgfg(argv);
     }
-     /* not a builtin command */
+     /* not a builtin command (include invalid syntax) */
     else{
 
         ret = 0;
@@ -360,6 +372,7 @@ int builtin_cmd(char **argv) {
 
 /* 
  * do_bgfg - Execute the builtin bg and fg commands
+ *  bg/fg %5 denotes jid 5, wheara bg/fg 5 denotes pid
  */
 void do_bgfg(char **argv) {
 
@@ -368,45 +381,50 @@ void do_bgfg(char **argv) {
         return;
     }
 
+    if(argv[1] == NULL){
+
+        return;
+    }
+
     int target_jid;
     pid_t target_pid;
-    u_int8_t fgbg = 1;
-    struct job_t* job_jid_ptr;
+    u_int8_t fgbg = 1; // define 0 for front ground; 1 for back ground
+    struct job_t* job_ptr;
 
-    fgbg = strcmp(argv[0], "bg") == 0; // 0 for front ground 1 for back ground
+    fgbg = strcmp(argv[0], "bg") == 0;
 
     /* argument is jid */
-    if(argv[0][0] == '%'){
+    if(argv[1][0] == '%'){
 
-        target_jid = atoi(argv[0][1]);
-        job_jid_ptr = getjobjid(jobs, target_jid);
+        target_jid = atoi(argv[1]);
+        job_ptr = getjobjid(jobs, target_jid);
     }
     /* argument is pid */
     else{
-        target_pid = atoi(argv[0][0]);
-        job_jid_ptr = getjobpid(jobs, target_pid);
+
+        target_pid = atoi(argv[1]);
+        job_ptr = getjobpid(jobs, target_pid);
     }
 
-    if(job_jid_ptr != NULL && job_jid_ptr->state == ST){
+    if(job_ptr != NULL && job_ptr->state == ST){
 
         #if (DEBUG_LOG)
             printf("process jid: %u is currently in ST mode!\n");
         #endif
 
-        Kill(-target_pid, SIGCONT); // send signal SIGCONT to process group jid
+        Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
 
         switch (fgbg){
 
             /* turn into fg and conduct a Wait() */
             case FRONT_GROUND:
-                job_jid_ptr->state = FG;
-                for(; Waitpid(target_pid, NULL, -1); );
+                job_ptr->state = FG;
+                waitfg(job_ptr->pid);
             break;
 
             /* turn into bg */
             case BACK_GROUND:
-                job_jid_ptr->state = BG;
-                waitfg(target_pid);
+                job_ptr->state = BG;
             break;
 
             case UNKNOWED:
@@ -443,8 +461,10 @@ void waitfg(pid_t pid){
     }
 
     /* wait until current job pid is not a front ground job anymore */
-    for(; fgpid(fg) != 0; );
+    for(; fgpid(fg) != 0; ){
 
+        sleep(1000); // wait for SIGCHLD
+    }
 }
 
 /*****************
