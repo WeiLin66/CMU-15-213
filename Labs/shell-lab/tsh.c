@@ -97,6 +97,16 @@ void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
 
+/* wrappers from csapp.c */
+pid_t Fork(void);
+pid_t Waitpid(pid_t pid, int *iptr, int options);
+void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+void Kill(pid_t pid, int signum);
+int Sigsuspend(const sigset_t *set);
+
+/* safe I/O print function */
+void Sio_error(char s[]);
+
 /*
  * main - The shell's main routine 
  */
@@ -220,7 +230,7 @@ void eval(char *cmdline) {
         /* fork a child process */
         if((pid = Fork()) == 0){
 
-            Sigprocmask(SIG_SETMASK, &prev_one); // unblock SIGCHLD
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL); // unblock SIGCHLD
 
             pid2jid(getpid()); // set child process's jid
 
@@ -461,10 +471,16 @@ void waitfg(pid_t pid){
         return;
     }
 
+    sigset_t mask;
+
+    /* block all signals except SIGCHLD */
+    sigfillset(&mask);
+    sigaddset(&mask, ~SIGCHLD);
+
     /* wait until current job pid is not a front ground job anymore */
     for(; fgpid(fg) != 0; ){
 
-        sleep(1000); // wait for SIGCHLD
+        Sigsuspend(&mask); // suspend until SIGCHLD arrives
     }
 }
 
@@ -542,7 +558,9 @@ void sigchld_handler(int sig) {
     /* quit waitpid successfully? */
     if(errno != ECHILD){
 
+        #if (DEBUG_LOG)
         Sio_error("waitpid error\n");
+        #endif
     }
 
     errno = olderr; // restore erron
@@ -898,6 +916,78 @@ void sigquit_handler(int sig) {
     
     printf("Terminating after receipt of SIGQUIT signal\n");
     exit(1);
+}
+
+pid_t Fork(void) {
+
+    pid_t pid;
+
+    if ((pid = fork()) < 0){
+	    
+        unix_error("Fork error");
+    }
+    return pid;
+}
+
+pid_t Waitpid(pid_t pid, int *iptr, int options) {
+
+    pid_t retpid;
+
+    if ((retpid  = waitpid(pid, iptr, options)) < 0) {
+	    
+        unix_error("Waitpid error");
+    }
+
+    return(retpid);
+}
+
+void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset){
+
+    if (sigprocmask(how, set, oldset) < 0){
+	    
+        unix_error("Sigprocmask error");
+    }
+    return;
+}
+
+void Kill(pid_t pid, int signum) {
+
+    int rc;
+
+    if ((rc = kill(pid, signum)) < 0){
+	    
+        unix_error("Kill error");
+    }
+}
+
+int Sigsuspend(const sigset_t *set){
+
+    int rc = sigsuspend(set); /* always returns -1 */
+    
+    if (errno != EINTR){
+     
+        unix_error("Sigsuspend error");
+    }
+
+    return rc;
+}
+
+/* safe I/O print function */
+
+ssize_t sio_puts(char s[]){ /* Put string */
+
+    return write(STDOUT_FILENO, s, sio_strlen(s)); //line:csapp:siostrlen
+}
+
+void sio_error(char s[]){ /* Put error message and exit */
+
+    sio_puts(s);
+    _exit(1); //line:csapp:sioexit
+}
+
+void Sio_error(char s[]){
+
+    sio_error(s);
 }
 
 
