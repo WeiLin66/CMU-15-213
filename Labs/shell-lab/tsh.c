@@ -217,9 +217,12 @@ void eval(char *cmdline) {
         /* avoid race condition here */
         Sigprocmask(SIG_BLOCK, &mask_one, &prev_one);
 
+        /* fork a child process */
         if((pid = Fork()) == 0){
 
             Sigprocmask(SIG_SETMASK, &prev_one); // unblock SIGCHLD
+
+            pid2jid(getpid()); // set child process's jid
 
             if(execve(argv[0], argv, environ) < 0){
 
@@ -228,23 +231,21 @@ void eval(char *cmdline) {
             }
         }
 
-        /* add job */
-        Sigprocmask(SIG_BLOCK, &mask_all, NULL);
-        addjob(jobs, pid, (bg ? BG : FG), buffer);
-        Sigprocmask(SIG_SETMASK, &prev_one, NULL);
+        Sigprocmask(SIG_BLOCK, &mask_all, NULL); // block all signals
+        addjob(jobs, pid, (bg ? BG : FG), buffer); // add job
+        Sigprocmask(SIG_SETMASK, &prev_one, NULL); // unblock all signals
 
-        /* wait for front ground job */
+        /* wait until front ground job is reaped */
         if(!bg){
 
-            int status;
+            waitfg(pid);
+        }
+        /* print back ground job message */
+        else{
 
-            if(Waitpid(pid, &status, 0) < 0){
-
-                unix_error("waitfg: waitpid error");
-            }else{
-
-                printf("%d %s", pid, cmdline);
-            }
+            #if (DEBUG_LOG)
+            printf("[back ground process: %s] [jid: %d] [pid: %d]", argv[0], pid, pid);
+            #endif
         }
     }
 
