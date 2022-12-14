@@ -473,9 +473,8 @@ void waitfg(pid_t pid){
 
     sigset_t mask;
 
-    /* block all signals except SIGCHLD */
+    /* block all signals */
     sigfillset(&mask);
-    sigaddset(&mask, ~SIGCHLD);
 
     /* wait until current job pid is not a front ground job anymore */
     for(; fgpid(fg) != 0; ){
@@ -505,7 +504,7 @@ void sigchld_handler(int sig) {
 
     sigfillset(&mask);
 
-    /* prevent handler being interrupted by other signal */
+    /* prevent handler being interrupted by other signals */
     Sigprocmask(SIG_BLOCK, &mask, &prev);
 
     /**
@@ -560,6 +559,7 @@ void sigchld_handler(int sig) {
 
         #if (DEBUG_LOG)
         Sio_error("waitpid error\n");
+        exit(1); // error status
         #endif
     }
 
@@ -918,6 +918,9 @@ void sigquit_handler(int sig) {
     exit(1);
 }
 
+/* 
+ * warppers
+ */
 pid_t Fork(void) {
 
     pid_t pid;
