@@ -19,9 +19,10 @@
 #define MAXJOBS    16           /* max jobs at any point in time */
 #define MAXJID     1 << 16      /* max job ID */
 
-#define DEBUG_ON    1
-#define DEBUG_OFF   0
-#define DEBUG_LOG   DEBUG_OFF
+#define DEBUG_ON        1
+#define DEBUG_OFF       0
+#define DEBUG_LOG       DEBUG_ON
+#define DEBUG_LOG_LEN   256
 
 /* Job states */
 #define UNDEF   0    /* undefined */
@@ -45,6 +46,11 @@ char prompt[] = "tsh> ";    /* command line prompt (DO NOT CHANGE) */
 int verbose = 0;            /* if true, print additional output */
 int nextjid = 1;            /* next job ID to allocate */
 char sbuf[MAXLINE];         /* for composing sprintf messages */
+
+/* DEBUG BUFFER */
+#if (DEBUG_LOG)
+char debug_log[DEBUG_LOG_LEN];
+#endif
 
 typedef enum{
     FRONT_GROUND = 0,
@@ -86,7 +92,7 @@ int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline);
 int deletejob(struct job_t *jobs, pid_t pid); 
 pid_t fgpid(struct job_t *jobs);
 struct job_t *getjobpid(struct job_t *jobs, pid_t pid);
-struct job_t *getjobjid(struct job_t *jobs, int jid); 
+struct job_t *getjobJid(struct job_t *jobs, int jid); 
 int pid2jid(pid_t pid); 
 void listbgjobs(struct job_t* jobs); // add by Zach
 void listjobs(struct job_t *jobs);
@@ -106,7 +112,7 @@ int Sigsuspend(const sigset_t *set);
 
 /* safe I/O print function */
 void Sio_error(char s[]);
-
+void Sio_print(char s[]);
 /*
  * main - The shell's main routine 
  */
@@ -213,7 +219,7 @@ void eval(char *cmdline) {
     sigemptyset(&mask_one);
     sigaddset(&mask_one, SIGCHLD);
 
-    strncpy(buffer, cmdline, strlen(cmdline));
+    strcpy(buffer, cmdline);
     bg = parseline(buffer, argv);
 
     /* empty command */
@@ -270,11 +276,6 @@ void eval(char *cmdline) {
  * the user has requested a FG job.  
  */
 int parseline(const char *cmdline, char **argv) {
-
-    if(cmdline == NULL || argv == NULL){
-
-        return;
-    }
 
     static char array[MAXLINE]; /* holds local copy of command line */
     char *buf = array;          /* ptr that traverses command line */
@@ -343,11 +344,6 @@ int parseline(const char *cmdline, char **argv) {
  */
 int builtin_cmd(char **argv) {
 
-    if(argv == NULL){
-
-        return;
-    }
-
     int ret = 1;
 
     /* quit the shell process */
@@ -408,7 +404,7 @@ void do_bgfg(char **argv) {
     if(argv[1][0] == '%'){
 
         target_jid = atoi(argv[1]);
-        job_ptr = getjobjid(jobs, target_jid);
+        job_ptr = getjobJid(jobs, target_jid);
     }
     /* argument is pid */
     else{
@@ -420,7 +416,7 @@ void do_bgfg(char **argv) {
     if(job_ptr != NULL && job_ptr->state == ST){
 
         #if (DEBUG_LOG)
-            printf("process jid: %u is currently in ST mode!\n");
+            printf("process is currently in ST mode!\n");
         #endif
 
         Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
@@ -448,7 +444,7 @@ void do_bgfg(char **argv) {
     }else{
 
         #if (DEBUG_LOG)
-            printf("process jid: %u is not found or is not in the ST mode!\n");
+            printf("process is not found or is not in the ST mode!\n");
         #endif
     }
 
@@ -471,15 +467,16 @@ void waitfg(pid_t pid){
         return;
     }
 
-    sigset_t mask;
+    // sigset_t mask;
 
-    /* block all signals */
-    sigfillset(&mask);
+    // /* block all signals */
+    // sigfillset(&mask);
 
     /* wait until current job pid is not a front ground job anymore */
     for(; fgpid(fg) != 0; ){
 
-        Sigsuspend(&mask); // suspend until SIGCHLD arrives
+        // Sigsuspend(&mask); // suspend until SIGCHLD arrives
+        sleep(100);
     }
 }
 
@@ -499,7 +496,6 @@ void sigchld_handler(int sig) {
     sigset_t mask, prev;
 
     int stat, olderr = errno; // save original errno
-
     pid_t pid;
 
     sigfillset(&mask);
@@ -515,12 +511,13 @@ void sigchld_handler(int sig) {
      * WCONTINUED: return if a stopped child has been resumed by delivery of SIGCONT
      */
     /* wait for all zombies */
-    while((pid = Waitpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
+    while((pid = waitpid(-1, &stat, WNOHANG | WUNTRACED)) > 0){
 
         if(WIFEXITED(stat)){
 
             #if (DEBUG_LOG)
-            Sio_error("child %lu is terminated normally\n", pid);
+            sprintf(debug_log, "child %d is terminated normally\n", pid);
+            Sio_print(debug_log);
             #endif
 
             /* delete child process */
@@ -528,7 +525,8 @@ void sigchld_handler(int sig) {
         }else if(WIFSIGNALED(stat)){
 
             #if (DEBUG_LOG)
-            Sio_error("child %lu is terminated by signal\n", pid);
+            sprintf(debug_log, "child %d is terminated by signal\n", pid);
+            Sio_print(debug_log);
             #endif
 
             /* child proces is terminated by signal */
@@ -536,8 +534,9 @@ void sigchld_handler(int sig) {
         }else if(WIFSTOPPED(stat)){
 
             #if (DEBUG_LOG)
-            Sio_error("child JID: %lu, PID: %lu is stopped by signal %lu\n", 
+            sprintf(debug_log, "child JID: %d, PID: %d is stopped by signal %d\n", 
                        pid2jid(pid), pid, WSTOPSIG(stat));
+            Sio_print(debug_log);
             #endif
 
             struct job_t* target = getjobpid(jobs, pid);
@@ -545,8 +544,9 @@ void sigchld_handler(int sig) {
         }else if(WIFCONTINUED(stat)){
 
             #if (DEBUG_LOG)
-            Sio_error("child JID: %lu, PID: %lu is resumed by signal SIGCONT\n", 
+            sprintf(debug_log, "child JID: %d, PID: %d is resumed by signal SIGCONT\n", 
                        pid2jid(pid), pid);
+            Sio_print(debug_log);
             #endif
         }
     }
@@ -558,8 +558,7 @@ void sigchld_handler(int sig) {
     if(errno != ECHILD){
 
         #if (DEBUG_LOG)
-        Sio_error("waitpid error\n");
-        exit(1); // error status
+        Sio_print("waitpid error\n");
         #endif
     }
 
@@ -750,7 +749,7 @@ struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {
     return NULL;
 }
 
-/* getjobjid  - Find a job (by JID) on the job list */
+/* getjobJid  - Find a job (by JID) on the job list */
 struct job_t *getjobJid(struct job_t *jobs, int jid) {
 
     int i;
@@ -798,8 +797,6 @@ void listbgjobs(struct job_t* jobs){
 
         return;
     }
-
-    int i;
 
     for(int i=0; i<MAXJOBS; i++){
 
@@ -975,7 +972,22 @@ int Sigsuspend(const sigset_t *set){
     return rc;
 }
 
-/* safe I/O print function */
+/* 
+ * safe I/O print function
+ */
+
+static size_t sio_strlen(char s[]){ // sio_strlen - Return length of string (from K&R)
+
+
+    int i = 0;
+
+    while (s[i] != '\0'){
+        
+        ++i;
+    }
+
+    return i;
+}
 
 ssize_t sio_puts(char s[]){ /* Put string */
 
@@ -991,6 +1003,11 @@ void sio_error(char s[]){ /* Put error message and exit */
 void Sio_error(char s[]){
 
     sio_error(s);
+}
+
+void Sio_print(char s[]){
+
+    sio_puts(s);
 }
 
 
