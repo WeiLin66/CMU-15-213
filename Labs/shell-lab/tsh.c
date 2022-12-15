@@ -238,7 +238,7 @@ void eval(char *cmdline) {
 
             Sigprocmask(SIG_SETMASK, &prev_one, NULL); // unblock SIGCHLD
 
-            pid2jid(getpid()); // set child process's jid
+            setpgid(0, 0); // set process group id 
 
             if(execve(argv[0], argv, environ) < 0){
 
@@ -260,7 +260,7 @@ void eval(char *cmdline) {
         else{
 
             #if (DEBUG_LOG)
-            printf("[back ground process: %s] [jid: %d] [pid: %d]", argv[0], pid, pid);
+            printf("[back ground process: %s] [pid: %d] [jid: %d]\n", argv[0], pid, getjobpid(jobs, pid)->jid);
             #endif
         }
     }
@@ -354,7 +354,8 @@ int builtin_cmd(char **argv) {
     /* lists all background jobs */
     else if(!strcmp(argv[0], "jobs")){
 
-        listbgjobs(jobs); // list only back ground job
+        listjobs(jobs);
+        // listbgjobs(jobs); // list only back ground job
     }
     /* restarts job by sending it a SIGCONT signal, and then runs it in the
        background. The job argument can be either a PID or a JID. */
@@ -403,7 +404,7 @@ void do_bgfg(char **argv) {
     /* argument is jid */
     if(argv[1][0] == '%'){
 
-        target_jid = atoi(argv[1]);
+        target_jid = atoi(argv[1]+1);
         job_ptr = getjobJid(jobs, target_jid);
     }
     /* argument is pid */
@@ -416,7 +417,7 @@ void do_bgfg(char **argv) {
     if(job_ptr != NULL && job_ptr->state == ST){
 
         #if (DEBUG_LOG)
-            printf("process is currently in ST mode!\n");
+            printf("Restart process %d\n", job_ptr->pid);
         #endif
 
         Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
@@ -467,16 +468,18 @@ void waitfg(pid_t pid){
         return;
     }
 
-    // sigset_t mask;
+    sigset_t mask;
 
-    // /* block all signals */
-    // sigfillset(&mask);
+    /* block all signals except SIGCHLD */
+    sigfillset(&mask);
+    sigdelset(&mask, SIGCHLD);
+    sigdelset(&mask, SIGINT);
+    sigdelset(&mask, SIGTSTP);
 
     /* wait until current job pid is not a front ground job anymore */
     for(; fgpid(fg) != 0; ){
 
-        // Sigsuspend(&mask); // suspend until SIGCHLD arrives
-        sleep(100);
+        Sigsuspend(&mask); // suspend until SIGCHLD arrives
     }
 }
 
@@ -516,7 +519,7 @@ void sigchld_handler(int sig) {
         if(WIFEXITED(stat)){
 
             #if (DEBUG_LOG)
-            sprintf(debug_log, "child %d is terminated normally\n", pid);
+            sprintf(debug_log, "child process [pid: %d] [pgid: %d] is terminated normally\n", pid, getpgid(pid));
             Sio_print(debug_log);
             #endif
 
@@ -555,10 +558,11 @@ void sigchld_handler(int sig) {
     Sigprocmask(SIG_SETMASK, &prev, NULL);
 
     /* quit waitpid successfully? */
-    if(errno != ECHILD){
+    if(errno){
 
         #if (DEBUG_LOG)
-        Sio_print("waitpid error\n");
+        sprintf(debug_log, "errno status %d\n", errno);
+        Sio_print(debug_log);
         #endif
     }
 
@@ -574,10 +578,13 @@ void sigchld_handler(int sig) {
  */
 void sigint_handler(int sig) {
 
+    Sio_print("\n");
+
     pid_t pid = fgpid(jobs);
 
     if(pid == 0){
 
+        Sio_print("No front ground job!\n");
         return ;
     }
 
@@ -593,14 +600,17 @@ void sigint_handler(int sig) {
  */
 void sigtstp_handler(int sig) {
 
+    Sio_print("\n");
+
     pid_t pid = fgpid(jobs);
 
     if(pid == 0){
 
+        Sio_print("No front ground job!\n");
         return ;
     }
 
-    Kill(-pid, SIGSTOP); // close front ground process group 
+    Kill(-pid, SIGSTOP); // stop front ground process group 
 
     return;
 }
@@ -810,7 +820,7 @@ void listbgjobs(struct job_t* jobs){
             continue;
         }
 
-       printf("[%d] (%d) ", jobs[i].jid, jobs[i].pid);
+       printf("[jid: %d] [pid: %d]\n", jobs[i].jid, jobs[i].pid);
     }
 }
 
@@ -1005,7 +1015,7 @@ void Sio_error(char s[]){
     sio_error(s);
 }
 
-void Sio_print(char s[]){
+void Sio_print(char* s){
 
     sio_puts(s);
 }
