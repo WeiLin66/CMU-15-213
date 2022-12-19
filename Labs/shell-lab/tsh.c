@@ -238,7 +238,7 @@ void eval(char *cmdline) {
 
             Sigprocmask(SIG_SETMASK, &prev_one, NULL); // unblock SIGCHLD
 
-            setpgid(0, 0); // set process group id 
+            setpgid(0, getpid()); // set process group id 
 
             if(execve(argv[0], argv, environ) < 0){
 
@@ -260,7 +260,7 @@ void eval(char *cmdline) {
         else{
 
             #if (DEBUG_LOG)
-            printf("[back ground process: %s] [pid: %d] [jid: %d]\n", argv[0], pid, getjobpid(jobs, pid)->jid);
+            printf("[%d] (%d) %s &\n", getjobpid(jobs, pid)->jid, pid, argv[0]);
             #endif
         }
     }
@@ -414,41 +414,32 @@ void do_bgfg(char **argv) {
         job_ptr = getjobpid(jobs, target_pid);
     }
 
-    if(job_ptr != NULL && job_ptr->state == ST){
+    Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
 
-        #if (DEBUG_LOG)
-            printf("Restart process %d\n", job_ptr->pid);
-        #endif
+    switch (fgbg){
 
-        Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
+        /* turn into fg and conduct a Wait() */
+        case FRONT_GROUND:
+            job_ptr->state = FG;
+            waitfg(job_ptr->pid);
+        break;
 
-        switch (fgbg){
+        /* turn into bg */
+        case BACK_GROUND:
+            job_ptr->state = BG;
 
-            /* turn into fg and conduct a Wait() */
-            case FRONT_GROUND:
-                job_ptr->state = FG;
-                waitfg(job_ptr->pid);
-            break;
+            #if (DEBUG_LOG)
+                printf("[%d] (%d) %s", job_ptr->jid, job_ptr->pid, job_ptr->cmdline);
+            #endif
+        break;
 
-            /* turn into bg */
-            case BACK_GROUND:
-                job_ptr->state = BG;
-            break;
-
-            case UNKNOWED:
-                #if (DEBUG_LOG)
-                    printf("fatal errror! fgbg is neither 0 nor 1\n");
-                #endif
-                exit(1);
-            break;
-        }
-    }else{
-
-        #if (DEBUG_LOG)
-            printf("process is not found or is not in the ST mode!\n");
-        #endif
+        case UNKNOWED:
+            #if (DEBUG_LOG)
+                printf("fatal errror! fgbg is neither 0 nor 1\n");
+            #endif
+            exit(1);
+        break;
     }
-
 }
 
 /* 
@@ -519,26 +510,29 @@ void sigchld_handler(int sig) {
         if(WIFEXITED(stat)){
 
             #if (DEBUG_LOG)
-            sprintf(debug_log, "child process [pid: %d] [pgid: %d] is terminated normally\n", pid, getpgid(pid));
-            Sio_print(debug_log);
+            // sprintf(debug_log, "child process [pid: %d] is terminated normally\n", pid);
+            // Sio_print(debug_log);
             #endif
 
             /* delete child process */
             deletejob(jobs, pid);
-        }else if(WIFSIGNALED(stat)){
+        }
+        /* child process was terminated by signal */
+        else if(WIFSIGNALED(stat)){
 
             #if (DEBUG_LOG)
-            sprintf(debug_log, "child %d is terminated by signal\n", pid);
+            sprintf(debug_log, "Job [%d] (%d) terminated by signal %d\n", getjobpid(jobs, pid)->jid, pid, WTERMSIG(stat));
             Sio_print(debug_log);
             #endif
 
-            /* child proces is terminated by signal */
             deletejob(jobs, pid);
-        }else if(WIFSTOPPED(stat)){
+        }
+        /* child process was stopped by signal */
+        else if(WIFSTOPPED(stat)){
 
             #if (DEBUG_LOG)
-            sprintf(debug_log, "child JID: %d, PID: %d is stopped by signal %d\n", 
-                       pid2jid(pid), pid, WSTOPSIG(stat));
+            sprintf(debug_log, "Job [%d] (%d) stopped by signal %d\n", 
+                       getjobpid(jobs, pid)->jid, pid, WSTOPSIG(stat));
             Sio_print(debug_log);
             #endif
 
@@ -558,13 +552,13 @@ void sigchld_handler(int sig) {
     Sigprocmask(SIG_SETMASK, &prev, NULL);
 
     /* quit waitpid successfully? */
-    if(errno){
+    // if(errno){
 
-        #if (DEBUG_LOG)
-        sprintf(debug_log, "errno status %d\n", errno);
-        Sio_print(debug_log);
-        #endif
-    }
+    //     #if (DEBUG_LOG)
+    //     sprintf(debug_log, "errno status %d\n", errno);
+    //     Sio_print(debug_log);
+    //     #endif
+    // }
 
     errno = olderr; // restore erron
     
@@ -577,8 +571,6 @@ void sigchld_handler(int sig) {
  *    to the foreground job.  
  */
 void sigint_handler(int sig) {
-
-    Sio_print("\n");
 
     pid_t pid = fgpid(jobs);
 
@@ -600,8 +592,6 @@ void sigint_handler(int sig) {
  */
 void sigtstp_handler(int sig) {
 
-    Sio_print("\n");
-
     pid_t pid = fgpid(jobs);
 
     if(pid == 0){
@@ -610,7 +600,7 @@ void sigtstp_handler(int sig) {
         return ;
     }
 
-    Kill(-pid, SIGSTOP); // stop front ground process group 
+    Kill(-pid, SIGTSTP); // stop front ground process group 
 
     return;
 }
