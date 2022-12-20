@@ -260,7 +260,17 @@ void eval(char *cmdline) {
         else{
 
             #if (DEBUG_LOG)
-            printf("[%d] (%d) %s &\n", getjobpid(jobs, pid)->jid, pid, argv[0]);
+            
+            int i=1;
+            strcpy(debug_log, argv[0]);
+
+            while(argv[i]){
+
+                strcat(debug_log, " ");
+                strcat(debug_log, argv[i++]);
+            }
+
+            printf("[%d] (%d) %s &\n", getjobpid(jobs, pid)->jid, pid, debug_log);
             #endif
         }
     }
@@ -389,29 +399,52 @@ void do_bgfg(char **argv) {
         return;
     }
 
-    if(argv[1] == NULL){
+    u_int8_t fgbg = 1; // define 0 for front ground; 1 for back ground
+    fgbg = strcmp(argv[0], "bg") == 0;
 
+    if(argv[1] == NULL){
+            
+        printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
     }
 
     int target_jid;
     pid_t target_pid;
-    u_int8_t fgbg = 1; // define 0 for front ground; 1 for back ground
     struct job_t* job_ptr;
-
-    fgbg = strcmp(argv[0], "bg") == 0;
 
     /* argument is jid */
     if(argv[1][0] == '%'){
 
         target_jid = atoi(argv[1]+1);
-        job_ptr = getjobJid(jobs, target_jid);
+
+        if(!target_jid){
+            
+            printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+            return;
+        }
+
+        if((job_ptr = getjobJid(jobs, target_jid)) == NULL){
+
+            printf("%%%d: No such job\n", target_jid);
+            return;
+        }
     }
     /* argument is pid */
     else{
 
         target_pid = atoi(argv[1]);
-        job_ptr = getjobpid(jobs, target_pid);
+
+        if(!target_pid){
+            
+            printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+            return;
+        }
+
+        if((job_ptr = getjobpid(jobs, target_pid)) == NULL){
+
+            printf("(%d): : No such process\n", target_pid);
+            return;
+        }
     }
 
     Kill(-(job_ptr->pid), SIGCONT); // Continue if stopped
