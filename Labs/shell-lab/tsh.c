@@ -105,13 +105,11 @@ handler_t *Signal(int signum, handler_t *handler);
 
 /* wrappers from csapp.c */
 pid_t Fork(void);
-pid_t Waitpid(pid_t pid, int *iptr, int options);
 void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 void Kill(pid_t pid, int signum);
 int Sigsuspend(const sigset_t *set);
 
 /* safe I/O print function */
-void Sio_error(char s[]);
 void Sio_print(char s[]);
 /*
  * main - The shell's main routine 
@@ -584,15 +582,6 @@ void sigchld_handler(int sig) {
     /* unblock all signals */
     Sigprocmask(SIG_SETMASK, &prev, NULL);
 
-    /* quit waitpid successfully? */
-    // if(errno){
-
-    //     #if (DEBUG_LOG)
-    //     sprintf(debug_log, "errno status %d\n", errno);
-    //     Sio_print(debug_log);
-    //     #endif
-    // }
-
     errno = olderr; // restore erron
     
     return;
@@ -962,18 +951,6 @@ pid_t Fork(void) {
     return pid;
 }
 
-pid_t Waitpid(pid_t pid, int *iptr, int options) {
-
-    pid_t retpid;
-
-    if ((retpid  = waitpid(pid, iptr, options)) < 0) {
-	    
-        unix_error("Waitpid error");
-    }
-
-    return(retpid);
-}
-
 void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset){
 
     if (sigprocmask(how, set, oldset) < 0){
@@ -1025,17 +1002,6 @@ static size_t sio_strlen(char s[]){ // sio_strlen - Return length of string (fro
 ssize_t sio_puts(char s[]){ /* Put string */
 
     return write(STDOUT_FILENO, s, sio_strlen(s)); //line:csapp:siostrlen
-}
-
-void sio_error(char s[]){ /* Put error message and exit */
-
-    sio_puts(s);
-    _exit(1); //line:csapp:sioexit
-}
-
-void Sio_error(char s[]){
-
-    sio_error(s);
 }
 
 void Sio_print(char* s){
