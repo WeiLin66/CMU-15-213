@@ -1,42 +1,34 @@
 # Shell Lab實驗紀錄
 
-## Intro
+## 簡介
 
-Files:
+本實驗要求我們編些一個供使用者交互的終端介面，類似於Linux中的shell終端。實驗中首先我們需要先解析輸入指令(這些指令可能包含多個參數)，且指令支持進程背景執行。
 
-- `Makefile` &rarr; Compiles your shell program and runs the tests
-- `README.md`  &rarr; This file
-- `tsh.c` &rarr; The shell program that you will write and hand in
-- `tshref` &rarr; The reference shell binary.
+另一個重點是該實驗模擬Unix系統中的作業控制(Job Control)，對創建的進程進行監控與管理(增、刪、改、查)。同時為了避免交互過程產生殭屍進程(Zombie)，我們需要編寫特殊的信號處理函式，並且該終端也要可以被Ctrl + C，Ctrl + Z退出程序和暫停程序。
 
-### The remaining files are used to test your shell
-- `sdriver.pl` &rarr; The trace-driven shell driver
-- `trace*.txt` &rarr; The 15 trace files that control the shell driver
-- `tshref.out`  &rarr;  Example output of the reference shell on all 15 traces
+細節部分可以參考資料夾中的`tshlab.pdf`中的`The tsh Specification`；環節程式編寫方面可以參考`shlab.pdf`
 
-### Little C programs that are called by the trace files
-- `myspin.c` &rarr; Takes argument <n> and spins for <n> seconds
-- `mysplit.c` &rarr; Forks a child that spins for <n> seconds
-- `mystop.c ` &rarr; Spins for <n> seconds and sends SIGTSTP to itself
-- `myint.c` &rarr; Spins for <n> seconds and sends SIGINT to itself
+## 主結構
 
-### 整體結構
+### 主程式架構
 
+### Jobs Control
 
+### 前臺與後臺進程
 
-### 目標編寫函式
+## 避免race condition
 
+## 目標編寫函式
 
+### 指令解析
 
-### 注意事項
+### built-in command部分
 
+### handlers部分
 
+## csapp.c參考範例
 
-### 程式碼實現
-
-
-
-### 驗證
+## 如何進行驗證
 
 
 
