@@ -43,7 +43,7 @@ To get a list of the driver flags:
 
 	unix> mdriver -h
 
-## 實驗紀錄
+## 實驗須知
 
 - 編寫一個動態記憶體分配器
 
@@ -173,3 +173,15 @@ To get a list of the driver flags:
         - 使用first fit搜索案地址分配的空閒塊
         - Best fit
       - 官方推薦順序: 隱式 &rarr; 顯式 &rarr; 分離式
+
+## 實驗紀錄
+### 隱式空閒列表
+- first fit
+- next fit
+
+### 顯式空閒列表
+- LIFO + first fit
+
+### 分離式空閒列表
+- LIFO + first fit
+- LIFO + best fit
