@@ -35,6 +35,38 @@ team_t team = {
     ""
 };
 
+/*********************************************************
+* Macros for block operation
+ ********************************************************/
+#define WSIZE                                      4
+#define DSIZE                                      8    // double size
+#define CHUNKSIZE                                  (1 << 12)   // extended heap size
+
+#define MAX(x, y)                                  ((x) > (y) ? (x) : (y))
+
+/* create header or footer message */
+#define PACK(size,  alloc)                         ((size) | (alloc))
+
+/* read & write header or footer message */
+#define GET(p)                                     (*((u_int64_t*)p))  // read 64 bits unsigned info form header
+#define PUT(val)                                   (*((u_int64_t*)p) = (val) )   // write 64 bits info to header
+
+/* get block size and allocated condition */
+#define GET_SIZE(p)                                (GET(p) & ~0x7)
+#define GET_ALLOC(p)                               (GET(p) & 0x1)
+
+/* get header and footer */
+#define HDRP(bp)                                    (u_int64_t*)(((u_int64_t*)bp) - DSIZE)
+#define FTRP(bp)                                    (u_int64_t*)(((uint8_t*)bp + GET_SIZE(HDRP(bp))) - (2 * DSIZE))
+
+/* get previous and next block by caculating current block point */
+#define NEXT_BLKP(bp)                               (void*)((uint8_t*)bp + GET_SIZE(HDRP(bp)))
+#define PREV_BLKP(bp)                               (void*)((uint8_t*)bp - (2 * DSIZE))
+/*********************************************************
+* Macros for replacement policies
+ ********************************************************/
+#define NEXT_FITx
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -61,7 +93,7 @@ void *mm_malloc(size_t size)
     int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1)
-	return NULL;
+    return NULL;
     else {
         *(size_t *)p = size;
         return (void *)((char *)p + SIZE_T_SIZE);
