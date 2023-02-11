@@ -39,22 +39,22 @@ team_t team = {
 /*********************************************************
 * Macros for block operation
  ********************************************************/
-#define WSIZE                                      4
-#define DSIZE                                      8    // double size
-#define CHUNKSIZE                                  (1 << 12)   // extended heap size: 4096
+#define WSIZE                                       4
+#define DSIZE                                       8    // double size
+#define CHUNKSIZE                                   (1 << 12)   // extended heap size: 4096
 
-#define MAX(x, y)                                  ((x) > (y) ? (x) : (y))
+#define MAX(x, y)                                   ((x) > (y) ? (x) : (y))
 
 /* create header or footer message */
-#define PACK(size,  alloc)                         ((size) | (alloc))
+#define PACK(size,  alloc)                          ((size) | (alloc))
 
 /* read & write a word at address p */
-#define GET(p)                                     (*(unsigned int*)(p))
-#define PUT(p, val)                                (*(unsigned int*)(p) = (val))
+#define GET(p)                                      (*(unsigned int*)(p))
+#define PUT(p, val)                                 (*(unsigned int*)(p) = (val))
 
 /* get size and allocated bit of a block */
-#define GET_SIZE(p)                                (GET(p) & ~0x7)
-#define GET_ALLOC(p)                               (GET(p) & 0x1)
+#define GET_SIZE(p)                                 mm_get_size(p)
+#define GET_ALLOC(p)                                mm_get_alloc(p)
 
 /* get header and footer */
 #define HDRP(bp)                                    (uint32_t*)(((uint32_t*)bp) - DSIZE)
@@ -105,6 +105,20 @@ static void* coalesce(void* bp);
 static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
+
+inline static uint32_t mm_get_size(void* p){
+
+    uint32_t header = GET(p);
+
+    return header & (0x7);
+}
+
+inline static uint32_t mm_get_alloc(void* p){
+
+    uint32_t header = GET(p);
+
+    return header & (0x1);
+}
 
 /* 
  * mm_init - initialize the malloc package.
@@ -206,47 +220,44 @@ void mm_free(void* bp){
  */ 
 static void* coalesce(void* bp){
 
-    size_t free_senario = GET_ALLOC(HDRP(PREV_BLKP(bp))) | (GET_ALLOC(HDRP(NEXT_BLKP(bp))) << 1);   
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+
     size_t size = GET_SIZE(HDRP(bp));
     uint8_t* ret_pointer = bp;
 
-    free_senario &= 0x0000000f;
+    /* case 1: none of the previos and next blocks aren free */
+    if(prev_alloc && next_alloc){
 
-    switch(free_senario){
+    }
+    /* case 1: previous block is free */
+    else if(!prev_alloc && next_alloc){
 
-        /* case 0: none of the previos and next blocks aren free */
-        case 0:{
-            // no need for coalescing
-        }break;
-        
-        /* case 1: previous block is free */
-        case 1:{
-            uint32_t total_size = size + GET_SIZE(HDRP(PREV_BLKP(bp)));
-            ret_pointer = PREV_BLKP(bp);
+        uint32_t total_size = size + GET_SIZE(HDRP(PREV_BLKP(bp)));
+        ret_pointer = PREV_BLKP(bp);
 
-            PUT(FTRP(bp), PACK(total_size, 0));
-            PUT(HDRP(ret_pointer), PACK(total_size, 0));
-        }break;
+        PUT(FTRP(bp), PACK(total_size, 0));
+        PUT(HDRP(ret_pointer), PACK(total_size, 0));        
+    }
+    /* case 2: next block is free */
+    else if(prev_alloc && !next_alloc){
 
-        /* case 2: next block is free */
-        case 3:{
-            uint32_t total_size = size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        uint32_t total_size = size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
-            PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
-            PUT(HDRP(bp), PACK(total_size, 0));
-        }break;
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
+        PUT(HDRP(bp), PACK(total_size, 0));        
+    }
+    /* case 3: both previous and next block are free */
+    else if(!prev_alloc && !next_alloc){
 
-        /* case 3: both previous and next block are free */
-        case 4:{
-            uint32_t total_size = size +            \
-                    GET_SIZE(HDRP(PREV_BLKP(bp))) + \
-                    GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        uint32_t total_size = size +            \
+            GET_SIZE(HDRP(PREV_BLKP(bp))) +     \
+            GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
-            ret_pointer = PREV_BLKP(bp);
+        ret_pointer = PREV_BLKP(bp);
 
-            PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
-            PUT(HDRP(ret_pointer), PACK(total_size, 0));
-        }break;
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
+        PUT(HDRP(ret_pointer), PACK(total_size, 0));        
     }
 
     #if (REPLACEMENT == NEXT_FIT)
