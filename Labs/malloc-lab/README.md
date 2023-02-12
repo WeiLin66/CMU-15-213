@@ -122,7 +122,7 @@ To get a list of the driver flags:
         - -d <i>設定debug等級
           - 預設1，可調範圍: 0~2，對塊中的內容作合法性檢測
         - -D 相當於-d2
-        - -s 經過\<s>秒後超時
+        - -s 經過\<s\>秒後超時
           - 預設沒有超時限制
     - 驗證項目
       - 空間使用率 &rarr; 如何減少fragmentation

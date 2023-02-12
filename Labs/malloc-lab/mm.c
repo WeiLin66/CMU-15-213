@@ -85,7 +85,7 @@ team_t team = {
 /* alignment size define */
 #define SIZE_T_SIZE     (ALIGN(sizeof(size_t)))
 
-#define MINIMUN_BLOCK   16
+#define MINIMUN_BLOCK   DSIZE + ALIGNMENT
 
 /*********************************************************
 * Global variables
