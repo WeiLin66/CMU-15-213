@@ -39,8 +39,8 @@ team_t team = {
 * Macros for block operation
  ********************************************************/
 #define WSIZE                                       4
-#define DSIZE                                       8    // double size
-#define CHUNKSIZE                                   (1 << 12)   // extended heap size: 4096
+#define DSIZE                                       8
+#define CHUNKSIZE                                   (1 << 12)
 
 #define MAX(x, y)                                   ((x) > (y) ? (x) : (y))
 
@@ -56,12 +56,12 @@ team_t team = {
 #define GET_ALLOC(p)                                (GET(p) & 0x1)
 
 /* get header and footer */
-#define HDRP(bp)                                    ((char *)(bp) - DSIZE)
-#define FTRP(bp)                                    ((char *)(bp) + GET_SIZE(HDRP(bp)) - (2*DSIZE))
+#define HDRP(bp)                                    ((char *)(bp) - WSIZE)
+#define FTRP(bp)                                    ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
 /* get previous and next meta block by caculating current block point */
-#define NEXT_BLKP(bp)                               ((char *)(bp) + GET_SIZE(((char *)(bp) - DSIZE))) 
-#define PREV_BLKP(bp)                               ((char *)(bp) - GET_SIZE(((char *)(bp) - (2*DSIZE))))
+#define NEXT_BLKP(bp)                               ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) 
+#define PREV_BLKP(bp)                               ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 /*********************************************************
 * Macros for replacement policies
  ********************************************************/
@@ -77,13 +77,15 @@ team_t team = {
 * Macros for alignment operations
  ********************************************************/
 /* single word (4) or double word (8) alignment */
-#define ALIGNMENT 8
+#define ALIGNMENT       8
 
 /* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
+#define ALIGN(size)     (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* alignment size define */
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+#define SIZE_T_SIZE     (ALIGN(sizeof(size_t)))
+
+#define MINIMUN_BLOCK   16
 
 /*********************************************************
 * Global variables
@@ -166,7 +168,7 @@ static void* extend_heap(size_t words){
     char* bp;
     ssize_t size;
  
-    size = words * DSIZE; // 8 bytes alignment
+    size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
 
     if((long)(bp = (mem_sbrk(size))) == -1){
 
@@ -193,7 +195,7 @@ static void place(void* bp, size_t asize){
 
     size_t size = GET_SIZE(HDRP(bp));
 
-    if(size - asize >= (2*DSIZE) + ALIGNMENT){ // split
+    if((size - asize) >= (2*DSIZE)){ // split
 
         /* current block */
         PUT(HDRP(bp), PACK(asize, 1));
@@ -287,8 +289,7 @@ static void checkheap(int verbose){
         printf("Heap (%p):\n", heap_listp);
     }
 
-    if(GET_SIZE(HDRP(heap_listp)) != (2*DSIZE) ||
-        !GET_ALLOC(HDRP(heap_listp))){
+    if(GET_SIZE(HDRP(heap_listp)) != DSIZE || !GET_ALLOC(HDRP(heap_listp))){
 
         printf("Bad prologue header\n");
     }
@@ -322,25 +323,24 @@ static void checkheap(int verbose){
 * void* realloc(void* ptr, size_t size)
 * void mm_checkheap(void)
  ********************************************************/
-
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void){
 
-    if((heap_listp = mem_sbrk(4 * DSIZE)) == (void*)-1){
+    if((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1){
 
         return -1;  // return -1 if exceed the boundary of heap
     }
 
     /* initialize 4 blocks */
-    PUT(heap_listp, 0);
-    PUT(heap_listp + DSIZE, PACK(2*DSIZE, 1));
-    PUT(heap_listp + (2*DSIZE), PACK(2*DSIZE, 1));
-    PUT(heap_listp + (3*DSIZE), PACK(0, 1));
+    PUT(heap_listp, 0);                             /* Alignment padding */
+    PUT(heap_listp + WSIZE, PACK(DSIZE, 1));        /* Prologue header */
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));    /* Prologue footer */
+    PUT(heap_listp + (3*WSIZE), PACK(0, 1));        /* Epilogue header */
 
     /* move pointer heap_listp */
-    heap_listp += (2*DSIZE);
+    heap_listp += (2*WSIZE);
 
     /* next fit pointer */
     #if (REPLACEMENT == NEXT_FIT)
@@ -348,7 +348,7 @@ int mm_init(void){
     #endif
 
     /* each block will be at least 8 bytes */
-    if(extend_heap(CHUNKSIZE/DSIZE) == NULL){
+    if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
 
         return -1;
     }
@@ -373,15 +373,25 @@ void *mm_malloc(size_t size){
     }
 
     size_t asize;
+    size_t extendsize;
     char* bp;    
 
     /* 8 bytes alignment */
     asize = ALIGN(size);
 
     /* payload size plus header and footer */
-    asize += (2*DSIZE);
+    asize += DSIZE;
 
     if((bp = find_fit(asize)) != NULL){
+
+        place(bp, asize);
+        return bp;
+    }
+
+    /* if no fit found, then get external memory form kernel and plus block */
+    extendsize = MAX(asize, CHUNKSIZE);
+
+    if((bp = extend_heap(extendsize/WSIZE)) != NULL){
 
         place(bp, asize);
         return bp;
@@ -401,14 +411,14 @@ void mm_free(void* bp){
         return;
     }
 
-    if(heap_listp == NULL){
+    if((char*)bp < (char*)mem_heap_lo() || (char*)bp >= (char*)mem_heap_hi()){
 
         return;
     }
 
-    if((char*)bp < (char*)heap_listp + DSIZE || (char*)bp > (char*)mem_heap_hi - DSIZE){
+    if(heap_listp == NULL){
 
-        return;
+        mm_init();
     }
 
     size_t size = GET_SIZE(HDRP(bp));
@@ -426,15 +436,39 @@ void *mm_realloc(void *ptr, size_t size){
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
-    
+
+    /* if size equal to zero then conduct mm_free() and return NULL */
+    if(size == 0){
+
+        mm_free(ptr);
+        return NULL;
+    }
+
+    /* if ptr equal to NULL then this is just mm_malloc() */
+    if(ptr == NULL){
+
+        return mm_malloc(size);
+    }
+
+    /* allocate a new block */
     newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
+
+    if (newptr == NULL){
+    
+        return NULL;
+    }
+
+    copySize = GET_SIZE(HDRP(oldptr)); // get old block size
+    
+    /* if the goal of mm_realloc() is to shrink block size */
+    if (size < copySize){
+        
+        copySize = size;
+    }
+    
     memcpy(newptr, oldptr, copySize);
     mm_free(oldptr);
+    
     return newptr;
 }
 
