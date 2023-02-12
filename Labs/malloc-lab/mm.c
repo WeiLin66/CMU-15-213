@@ -14,7 +14,6 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdint.h>
 
 #include "mm.h"
 #include "memlib.h"
@@ -53,16 +52,16 @@ team_t team = {
 #define PUT(p, val)                                 (*(unsigned int*)(p) = (val))
 
 /* get size and allocated bit of a block */
-#define GET_SIZE(p)                                 mm_get_size(p)
-#define GET_ALLOC(p)                                mm_get_alloc(p)
+#define GET_SIZE(p)                                 (GET(p) & ~0x7)
+#define GET_ALLOC(p)                                (GET(p) & 0x1)
 
 /* get header and footer */
-#define HDRP(bp)                                    (uint32_t*)(((uint32_t*)bp) - DSIZE)
-#define FTRP(bp)                                    (uint32_t*)(((uint8_t*)bp + GET_SIZE(HDRP(bp))) - (2 * DSIZE))
+#define HDRP(bp)                                    ((char *)(bp) - DSIZE)
+#define FTRP(bp)                                    ((char *)(bp) + GET_SIZE(HDRP(bp)) - (2*DSIZE))
 
 /* get previous and next meta block by caculating current block point */
-#define NEXT_BLKP(bp)                               (void*)((uint8_t*)bp + GET_SIZE(HDRP(bp)))
-#define PREV_BLKP(bp)                               (void*)((uint8_t*)bp - GET_SIZE((uint8_t*)bp - (2*DSIZE))
+#define NEXT_BLKP(bp)                               ((char *)(bp) + GET_SIZE(((char *)(bp) - DSIZE))) 
+#define PREV_BLKP(bp)                               ((char *)(bp) - GET_SIZE(((char *)(bp) - (2*DSIZE))))
 /*********************************************************
 * Macros for replacement policies
  ********************************************************/
@@ -89,10 +88,10 @@ team_t team = {
 /*********************************************************
 * Global variables
  ********************************************************/
-static uint8_t* heap_listp = NULL;
+static char* heap_listp = NULL;
 
 #if (REPLACEMENT == NEXT_FIT)
-static uint8_t* rover = NULL;
+static char* rover = NULL;
 #endif
 
 /*********************************************************
@@ -106,19 +105,21 @@ static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
 
-inline static uint32_t mm_get_size(void* p){
+#if 0
+inline static unsigned int mm_get_size(void* p){
 
-    uint32_t header = GET(p);
+    unsigned int header = GET(p);
 
     return header & (0x7);
 }
 
-inline static uint32_t mm_get_alloc(void* p){
+inline static unsigned int mm_get_alloc(void* p){
 
-    uint32_t header = GET(p);
+    unsigned int header = GET(p);
 
     return header & (0x1);
 }
+#endif
 
 /* 
  * mm_init - initialize the malloc package.
@@ -170,7 +171,7 @@ void *mm_malloc(size_t size){
     }
 
     size_t asize;
-    uint8_t* bp;    
+    char* bp;    
 
     /* 8 bytes alignment */
     asize = ALIGN(size);
@@ -203,7 +204,7 @@ void mm_free(void* bp){
         return;
     }
 
-    if((uint8_t*)bp < (uint8_t*)heap_listp + DSIZE || (uint8_t*)bp > (uint8_t*)mem_heap_hi - DSIZE){
+    if((char*)bp < (char*)heap_listp + DSIZE || (char*)bp > (char*)mem_heap_hi - DSIZE){
 
         return;
     }
@@ -224,7 +225,7 @@ static void* coalesce(void* bp){
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
 
     size_t size = GET_SIZE(HDRP(bp));
-    uint8_t* ret_pointer = bp;
+    char* ret_pointer = bp;
 
     /* case 1: none of the previos and next blocks aren free */
     if(prev_alloc && next_alloc){
@@ -233,7 +234,7 @@ static void* coalesce(void* bp){
     /* case 1: previous block is free */
     else if(!prev_alloc && next_alloc){
 
-        uint32_t total_size = size + GET_SIZE(HDRP(PREV_BLKP(bp)));
+        unsigned int total_size = size + GET_SIZE(HDRP(PREV_BLKP(bp)));
         ret_pointer = PREV_BLKP(bp);
 
         PUT(FTRP(bp), PACK(total_size, 0));
@@ -242,7 +243,7 @@ static void* coalesce(void* bp){
     /* case 2: next block is free */
     else if(prev_alloc && !next_alloc){
 
-        uint32_t total_size = size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        unsigned int total_size = size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
         PUT(HDRP(bp), PACK(total_size, 0));        
@@ -250,8 +251,8 @@ static void* coalesce(void* bp){
     /* case 3: both previous and next block are free */
     else if(!prev_alloc && !next_alloc){
 
-        uint32_t total_size = size +            \
-            GET_SIZE(HDRP(PREV_BLKP(bp))) +     \
+        unsigned int total_size = size +            \
+            GET_SIZE(HDRP(PREV_BLKP(bp))) +         \
             GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         ret_pointer = PREV_BLKP(bp);
@@ -270,8 +271,8 @@ static void* coalesce(void* bp){
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size)
-{
+void *mm_realloc(void *ptr, size_t size){
+
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
@@ -279,7 +280,7 @@ void *mm_realloc(void *ptr, size_t size)
     newptr = mm_malloc(size);
     if (newptr == NULL)
       return NULL;
-    copySize = *(size_t *)((uint8_t *)oldptr - SIZE_T_SIZE);
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
     if (size < copySize)
       copySize = size;
     memcpy(newptr, oldptr, copySize);
@@ -293,10 +294,10 @@ void *mm_realloc(void *ptr, size_t size)
  */ 
 static void* extend_heap(size_t words){
 
-    uint8_t* bp;
+    char* bp;
     ssize_t size;
  
-    size = word * DSIZE; // 8 bytes alignment
+    size = words * DSIZE; // 8 bytes alignment
 
     if((long)(bp = (mem_sbrk(size))) == -1){
 
@@ -307,7 +308,7 @@ static void* extend_heap(size_t words){
     PUT(FTRP(bp), PACK(size, 0));
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
 
-    reutrn coalesce(bp);
+    return coalesce(bp);
 }
 
 /** 
