@@ -459,6 +459,15 @@ void *mm_realloc(void *ptr, size_t size){
     }
 
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
+
+    /* simply extends original block payload by adjusting header and footer */
+    if(copySize - DSIZE >= size){
+
+        PUT(HDRP(oldptr), PACK(size, 1));
+        PUT(FTRP(oldptr), PACK(size, 1));
+        
+        return oldptr;
+    }
     
     /* if the goal of mm_realloc() is to shrink block size */
     if (size < copySize){
