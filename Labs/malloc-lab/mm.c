@@ -105,117 +105,6 @@ static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
 
-#if 0
-inline static unsigned int mm_get_size(void* p){
-
-    unsigned int header = GET(p);
-
-    return header & (0x7);
-}
-
-inline static unsigned int mm_get_alloc(void* p){
-
-    unsigned int header = GET(p);
-
-    return header & (0x1);
-}
-#endif
-
-/* 
- * mm_init - initialize the malloc package.
- */
-int mm_init(void){
-
-    if((heap_listp = mem_sbrk(4 * DSIZE)) == (void*)-1){
-
-        return -1;  // return -1 if exceed the boundary of heap
-    }
-
-    /* initialize 4 blocks */
-    PUT(heap_listp, 0);
-    PUT(heap_listp + DSIZE, PACK(2*DSIZE, 1));
-    PUT(heap_listp + (2*DSIZE), PACK(2*DSIZE, 1));
-    PUT(heap_listp + (3*DSIZE), PACK(0, 1));
-
-    /* move pointer heap_listp */
-    heap_listp += (2*DSIZE);
-
-    /* next fit pointer */
-    #if (REPLACEMENT == NEXT_FIT)
-         // rover = heap_listp;
-    #endif
-
-    /* each block will be at least 8 bytes */
-    if(extend_heap(CHUNKSIZE/DSIZE) == NULL){
-
-        return -1;
-    }
-
-    return 0;
-}
-
-/* 
- * mm_malloc - Allocate a block by incrementing the brk pointer.
- *     Always allocate a block whose size is a multiple of the alignment.
- */
-void *mm_malloc(size_t size){
-
-    if(heap_listp == NULL){
-
-        mm_init();
-    }
-
-    if(size <= 0){
-
-        return NULL;
-    }
-
-    size_t asize;
-    char* bp;    
-
-    /* 8 bytes alignment */
-    asize = ALIGN(size);
-
-    /* payload size plus header and footer */
-    asize += (2*DSIZE);
-
-    if((bp = find_fit(asize)) != NULL){
-
-        place(bp, asize);
-        return bp;
-    }
-
-    return NULL;
-}
-
-/*
- * mm_free - Freeing a block does nothing.
- */
-void mm_free(void* bp){
-
-    /* error handles */
-    if(bp == NULL){
-
-        return;
-    }
-
-    if(heap_listp == NULL){
-
-        return;
-    }
-
-    if((char*)bp < (char*)heap_listp + DSIZE || (char*)bp > (char*)mem_heap_hi - DSIZE){
-
-        return;
-    }
-
-    size_t size = GET_SIZE(HDRP(bp));
-
-    PUT(HDRP(bp), PACK(size, 0));
-    PUT(FTRP(bp), PACK(size, 0));
-    coalesce(bp);    
-}
-
 /**
  * @bried merge blocks when conducts free operation
  */ 
@@ -266,26 +155,6 @@ static void* coalesce(void* bp){
     #endif
 
     return ret_pointer;
-}
-
-/*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size){
-
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
 }
 
 /**
@@ -388,7 +257,7 @@ static void printblock(void* bp){
         return;
     }
 
-    printf("%p: header: [%ld:%c] footer: [%ld:%c]\n", bp, 
+    printf("%p: header: [%d:%c] footer: [%d:%c]\n", bp, 
            hsize, (halloc ? 'a' : 'f'), 
            fsize, (falloc ? 'a' : 'f')); 
 }
@@ -409,7 +278,7 @@ static void checkblock(void* bp){
     }    
 }
 
-void checkheap(int verbose){
+static void checkheap(int verbose){
 
     char* bp = heap_listp;
 
@@ -444,3 +313,136 @@ void checkheap(int verbose){
         printf("Bad epilouge header\n");
     }
 }
+
+/*********************************************************
+* this section contains major finctions:
+* int mm_init(void)
+* void* mm_malloc(size_t size)
+* void mm_free(void* ptr)
+* void* realloc(void* ptr, size_t size)
+* void mm_checkheap(void)
+ ********************************************************/
+
+/* 
+ * mm_init - initialize the malloc package.
+ */
+int mm_init(void){
+
+    if((heap_listp = mem_sbrk(4 * DSIZE)) == (void*)-1){
+
+        return -1;  // return -1 if exceed the boundary of heap
+    }
+
+    /* initialize 4 blocks */
+    PUT(heap_listp, 0);
+    PUT(heap_listp + DSIZE, PACK(2*DSIZE, 1));
+    PUT(heap_listp + (2*DSIZE), PACK(2*DSIZE, 1));
+    PUT(heap_listp + (3*DSIZE), PACK(0, 1));
+
+    /* move pointer heap_listp */
+    heap_listp += (2*DSIZE);
+
+    /* next fit pointer */
+    #if (REPLACEMENT == NEXT_FIT)
+         // rover = heap_listp;
+    #endif
+
+    /* each block will be at least 8 bytes */
+    if(extend_heap(CHUNKSIZE/DSIZE) == NULL){
+
+        return -1;
+    }
+
+    return 0;
+}
+
+/* 
+ * mm_malloc - Allocate a block by incrementing the brk pointer.
+ *     Always allocate a block whose size is a multiple of the alignment.
+ */
+void *mm_malloc(size_t size){
+
+    if(heap_listp == NULL){
+
+        mm_init();
+    }
+
+    if(size <= 0){
+
+        return NULL;
+    }
+
+    size_t asize;
+    char* bp;    
+
+    /* 8 bytes alignment */
+    asize = ALIGN(size);
+
+    /* payload size plus header and footer */
+    asize += (2*DSIZE);
+
+    if((bp = find_fit(asize)) != NULL){
+
+        place(bp, asize);
+        return bp;
+    }
+
+    return NULL;
+}
+
+/*
+ * mm_free - Freeing a block does nothing.
+ */
+void mm_free(void* bp){
+
+    /* error handles */
+    if(bp == NULL){
+
+        return;
+    }
+
+    if(heap_listp == NULL){
+
+        return;
+    }
+
+    if((char*)bp < (char*)heap_listp + DSIZE || (char*)bp > (char*)mem_heap_hi - DSIZE){
+
+        return;
+    }
+
+    size_t size = GET_SIZE(HDRP(bp));
+
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+    coalesce(bp);    
+}
+
+/*
+ * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ */
+void *mm_realloc(void *ptr, size_t size){
+
+    void *oldptr = ptr;
+    void *newptr;
+    size_t copySize;
+    
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+      return NULL;
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    if (size < copySize)
+      copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
+}
+
+/* 
+ * mm_checkheap - Check the heap for correctness
+ */
+void mm_checkheap(int verbose){
+
+    checkheap(verbose);
+}
+
