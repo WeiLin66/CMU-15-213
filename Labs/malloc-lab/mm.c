@@ -195,7 +195,7 @@ static void place(void* bp, size_t asize){
 
     size_t size = GET_SIZE(HDRP(bp));
 
-    if((size - asize) >= (2*DSIZE)){ // split
+    if((size - asize) >= MINIMUN_BLOCK){ // split
 
         /* current block */
         PUT(HDRP(bp), PACK(asize, 1));
