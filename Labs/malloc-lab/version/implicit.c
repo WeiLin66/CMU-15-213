@@ -37,23 +37,6 @@ team_t team = {
 };
 
 /*********************************************************
-* Macros for data structures
- ********************************************************/
-
-#define IMPLICIT                                    0
-#define EXPLICIT                                    1
-#define STRUCTURE                                   IMPLICIT
-
-/*********************************************************
-* Macros for replacement policies
- ********************************************************/
-
-#define FIRST_FIT                                   0
-#define NEXT_FIT                                    1
-#define BEST_FIT                                    2
-#define REPLACEMENT                                 NEXT_FIT
-
-/*********************************************************
 * Macros for block operation
  ********************************************************/
 
@@ -82,42 +65,31 @@ team_t team = {
 #define NEXT_BLKP(bp)                               ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) 
 #define PREV_BLKP(bp)                               ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-/* get previous block's footer */
-#define PREV_FTRP(bp)                               ((char *)(bp) - DSIZE)
-
 /*********************************************************
-* Macros for getting and setting explicit block's pointers
+* Macros for replacement policies
  ********************************************************/
 
-#if (STRUCTURE == EXPLICIT)
-#define GET_NEXT_FREE_BLKP(bp)                          (*(unsigned int *)(bp))
-#define GET_PREV_FREE_BLKP(bp)                          (*((unsigned int *)(bp) + 1))
-#define PUT_NEXT_FREE_BLKP(bp, val)                     (*(unsigned int *)(bp) = (val))
-#define PUT_PREV_FREE_BLKP(bp, val)                     (*((unsigned int *)(bp) + 1) = (val))
-#endif
+#define FIRST_FIT       0
+#define NEXT_FIT        1
+#define BEST_FIT        2
+
+#define REPLACEMENT     NEXT_FIT
 
 /*********************************************************
 * Macros for alignment operations
  ********************************************************/
 
 /* single word (4) or double word (8) alignment */
-#define ALIGNMENT               DSIZE
+#define ALIGNMENT       DSIZE
 
 /* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size)             (((size) + (ALIGNMENT-1)) & ~0x7)
+#define ALIGN(size)     (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* alignment size define */
-#define SIZE_T_SIZE             (ALIGN(sizeof(size_t)))
-
-/* explicit list contains two extra pointers */
-#if (STRUCTURE == EXPLICIT)
-#define  EXTRA_LENGTH           DSIZE
-#else
-#define  EXTRA_LENGTH           0
-#endif
+#define SIZE_T_SIZE     (ALIGN(sizeof(size_t)))
 
 /* minimun alignment block size */
-#define MINIMUN_BLOCK           DSIZE + SIZE_T_SIZE + EXTRA_LENGTH
+#define MINIMUN_BLOCK   DSIZE + SIZE_T_SIZE
 
 /*********************************************************
 * Macros for debugging message
@@ -149,10 +121,6 @@ static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
 __inline static int checkheap_boundary(void* bp);
-#if (STRUCTURE == EXPLICIT)
-static void insert(void* bp);
-static void remove(void* bp);
-#endif
 
 /**
  * @brief extend heap with free block and return its block pointer 
@@ -176,14 +144,9 @@ static void* extend_heap(size_t words){
         return NULL;
     }
 
-    PUT(HDRP(bp), PACK(size, 0));           // header
-    PUT(FTRP(bp), PACK(size, 0));           // footer
+    PUT(HDRP(bp), PACK(size, 0));   // header
+    PUT(FTRP(bp), PACK(size, 0));   // footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
-
-#if (STRCTURE == EXPLICIT)
-    PUT_NEXT_FREE_BLKP(bp, 0)               // set next pointer to NULL
-    PUT_PREV_FREE_BLKP(bp, 0)               // set previous pointer to NULL
-#endif
 
     return coalesce(bp);    // the end of the previous block could be free
 }
@@ -302,7 +265,7 @@ static void* coalesce(void* bp){
         return bp;
     }
 
-    size_t prev_alloc = GET_ALLOC(PREV_FTRP(bp));
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
@@ -314,21 +277,16 @@ static void* coalesce(void* bp){
     /* case 2: previous block is free */
     else if(!prev_alloc && next_alloc){
 
-#if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(bp));
-#endif          
-        size += GET_SIZE(PREV_FTRP(bp));
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
 
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+
     }
     /* case 3: next block is free */
     else if(prev_alloc && !next_alloc){
 
-#if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(NEXT_BLKP(bp)));
-#endif           
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
@@ -337,15 +295,12 @@ static void* coalesce(void* bp){
     /* case 4: both previous and next block are free */
     else if(!prev_alloc && !next_alloc){
 
-#if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(bp));
-    remove(PREV_BLKP(NEXT_BLKP(bp)));
-#endif
-        size += GET_SIZE(PREV_FTRP(bp)) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+
     }
 
 #if (REPLACEMENT == NEXT_FIT)
@@ -354,10 +309,6 @@ static void* coalesce(void* bp){
         rover = bp;
     }
 #endif
-
-#if (STRUCTURE == EXPLICIT)
-    insert(bp); // insert block to free list
-#endif  
 
     return bp;
 }
@@ -473,28 +424,6 @@ __inline static int checkheap_boundary(void* bp){
     return (bp < mem_heap_lo()) ? -1 : 
     ((char*)bp > (char*)mem_heap_hi() - 3 - SIZE_T_SIZE + WSIZE) ? -1 : 0;
 }
-
-#if (STRUCTURE == EXPLICIT)
-/**
- * @brief insert block at the top of the free list (LIFO)
- * 
- * @param bp data block address
- */
-static void insert(void* bp){
-
-    // need implementation
-}
-
-/**
- * @brief remove block from the free list
- * 
- * @param bp data block address
- */
-static void remove(void* bp){
-
-    // need implementation
-}
-#endif
 
 /*********************************************************
 * this section contains major finctions:
@@ -622,11 +551,8 @@ void mm_free(void* bp){
         return;
     }
 
-    /* adjust header and footer allocated bit */
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-
-    /* merge blocks(if any) */
     coalesce(bp);    
 }
 

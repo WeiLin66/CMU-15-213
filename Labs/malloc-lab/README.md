@@ -180,6 +180,7 @@ To get a list of the driver flags:
 ### 隱式空閒列表
 - first fit
 - next fit
+- best fit
 
 ### 顯式空閒列表
 - LIFO + first fit
