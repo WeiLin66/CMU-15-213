@@ -119,7 +119,7 @@ To get a list of the driver flags:
         - -l 執行libc版本的malloc，比對跟我們編寫的分配器之間效能差距
         - -V 打印詳細執行信息
         - -v <verbose level>手動設定打印消息等級
-        - -d <i>設定debug等級
+        - -d \<i\>設定debug等級
           - 預設1，可調範圍: 0~2，對塊中的內容作合法性檢測
         - -D 相當於-d2
         - -s 經過\<s\>秒後超時

@@ -22,6 +22,7 @@
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your team information in the following struct.
  ********************************************************/
+
 team_t team = {
     /* Team name */
     "ateam",
@@ -38,6 +39,7 @@ team_t team = {
 /*********************************************************
 * Macros for block operation
  ********************************************************/
+
 #define WSIZE                                       4
 #define DSIZE                                       8
 #define CHUNKSIZE                                   (1 << 12)
@@ -45,7 +47,7 @@ team_t team = {
 #define MAX(x, y)                                   ((x) > (y) ? (x) : (y))
 
 /* create header or footer message */
-#define PACK(size,  alloc)                          ((size) | (alloc))
+#define PACK(size, alloc)                           ((size) | (alloc))
 
 /* read & write a word at address p */
 #define GET(p)                                      (*(unsigned int*)(p))
@@ -55,13 +57,14 @@ team_t team = {
 #define GET_SIZE(p)                                 (GET(p) & ~0x7)
 #define GET_ALLOC(p)                                (GET(p) & 0x1)
 
-/* get header and footer */
+/* get header and footer from data block pointer */
 #define HDRP(bp)                                    ((char *)(bp) - WSIZE)
 #define FTRP(bp)                                    ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
-/* get previous and next meta block by caculating current block point */
+/* get previous and next data block by adding or subtracting block size */
 #define NEXT_BLKP(bp)                               ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) 
 #define PREV_BLKP(bp)                               ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+
 /*********************************************************
 * Macros for replacement policies
  ********************************************************/
@@ -76,8 +79,9 @@ team_t team = {
 /*********************************************************
 * Macros for alignment operations
  ********************************************************/
+
 /* single word (4) or double word (8) alignment */
-#define ALIGNMENT       8
+#define ALIGNMENT       DSIZE
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size)     (((size) + (ALIGNMENT-1)) & ~0x7)
@@ -85,11 +89,23 @@ team_t team = {
 /* alignment size define */
 #define SIZE_T_SIZE     (ALIGN(sizeof(size_t)))
 
-#define MINIMUN_BLOCK   DSIZE + ALIGNMENT
+/* minimun alignment block size */
+#define MINIMUN_BLOCK   DSIZE + SIZE_T_SIZE
+
+/*********************************************************
+* Macro for debugging message
+ ********************************************************/
+
+#define SHOW_WARNING()  printf("[Warning] [File: %s] [Func: %s] [Line: %u]", \
+                                __FILE__, __FUNCTION__, __LINE__             \
+                        )
+
+#define BLOCK_DETAIL(bp)  // printblock((bp))
 
 /*********************************************************
 * Global variables
  ********************************************************/
+
 static char* heap_listp = NULL;
 
 #if (REPLACEMENT == NEXT_FIT)
@@ -99,6 +115,7 @@ static char* rover = NULL;
 /*********************************************************
 * Function prototypes for internal helper for routines
  ********************************************************/
+
 static void* extend_heap(size_t words);
 static void place(void* bp, size_t asize);
 static void* find_fit(size_t asize);
@@ -106,92 +123,52 @@ static void* coalesce(void* bp);
 static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
-
-/**
- * @bried merge blocks when conducts free operation
- */ 
-static void* coalesce(void* bp){
-
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-
-    size_t size = GET_SIZE(HDRP(bp));
-    char* ret_pointer = bp;
-
-    /* case 1: none of the previos and next blocks aren free */
-    if(prev_alloc && next_alloc){
-
-    }
-    /* case 1: previous block is free */
-    else if(!prev_alloc && next_alloc){
-
-        unsigned int total_size = size + GET_SIZE(HDRP(PREV_BLKP(bp)));
-        ret_pointer = PREV_BLKP(bp);
-
-        PUT(FTRP(bp), PACK(total_size, 0));
-        PUT(HDRP(ret_pointer), PACK(total_size, 0));        
-    }
-    /* case 2: next block is free */
-    else if(prev_alloc && !next_alloc){
-
-        unsigned int total_size = size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
-
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
-        PUT(HDRP(bp), PACK(total_size, 0));        
-    }
-    /* case 3: both previous and next block are free */
-    else if(!prev_alloc && !next_alloc){
-
-        unsigned int total_size = size +            \
-            GET_SIZE(HDRP(PREV_BLKP(bp))) +         \
-            GET_SIZE(HDRP(NEXT_BLKP(bp)));
-
-        ret_pointer = PREV_BLKP(bp);
-
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(total_size, 0));
-        PUT(HDRP(ret_pointer), PACK(total_size, 0));        
-    }
-
-    #if (REPLACEMENT == NEXT_FIT)
-
-    #endif
-
-    return ret_pointer;
-}
-
+__inline static int checkheap_boundary(void* bp);
 /**
  * @brief extend heap with free block and return its block pointer 
  * note that one word represent 4 bytes
+ * 
+ * @param words how many words does the kernel should extend the heap
  */ 
 static void* extend_heap(size_t words){
 
     char* bp;
     ssize_t size;
  
+    /* since the block is 8 bytes alignment, we need to make sure that
+     * the space we intend to enlarge is 2*words   
+     */
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
 
     if((long)(bp = (mem_sbrk(size))) == -1){
 
+        SHOW_WARNING();
         return NULL;
     }
 
-    PUT(HDRP(bp), PACK(size, 0));
-    PUT(FTRP(bp), PACK(size, 0));
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+    PUT(HDRP(bp), PACK(size, 0));   // header
+    PUT(FTRP(bp), PACK(size, 0));   // footer
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
 
-    return coalesce(bp);
+    return coalesce(bp);    // the end of the previous block could be free
 }
 
 /** 
  * @brief place - Place block of asize bytes at start of free block bp 
  * and split if remainder would be at least minimum block size
+ * 
+ * @param bp data block pointer
+ * @param asize asize of block to be allocated
  */
 static void place(void* bp, size_t asize){
 
     if(bp == NULL || asize <= 0){
 
+        SHOW_WARNING();
         return;
     }
+
+    BLOCK_DETAIL(bp);
 
     size_t size = GET_SIZE(HDRP(bp));
 
@@ -215,6 +192,8 @@ static void place(void* bp, size_t asize){
 
 /**
  * @brief find a free block that meets the asize requirment
+ * 
+ * @param asize asize of block that is intended to find
  */ 
 static void* find_fit(size_t asize){
 
@@ -225,6 +204,7 @@ static void* find_fit(size_t asize){
 
             if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
 
+                BLOCK_DETAIL(bp);
                 return bp;
             }
         }
@@ -236,13 +216,84 @@ static void* find_fit(size_t asize){
         // need implementation
     #endif
 
+    SHOW_WARNING();
     return NULL;
 }
 
 /**
+ * @brief merge blocks when conducts free operation
+ * 
+ * @param bp data block pointer
+ */ 
+static void* coalesce(void* bp){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return bp;
+    }
+
+    BLOCK_DETAIL(bp);
+
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+    size_t size = GET_SIZE(HDRP(bp));
+
+    /* case 1: none of the previos and next blocks aren free */
+    if(prev_alloc && next_alloc){
+        
+        return bp;
+    }
+    /* case 2: previous block is free */
+    else if(!prev_alloc && next_alloc){
+
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+
+        BLOCK_DETAIL(bp);        
+    }
+    /* case 3: next block is free */
+    else if(prev_alloc && !next_alloc){
+
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        PUT(HDRP(bp), PACK(size, 0));        
+    }
+    /* case 4: both previous and next block are free */
+    else if(!prev_alloc && !next_alloc){
+
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+
+        BLOCK_DETAIL(bp);
+    }
+
+    #if (REPLACEMENT == NEXT_FIT)
+
+    #endif
+
+    return bp;
+}
+
+/**
  * @brief print specific block's header and footer info
+ * 
+ * @param bp data block pointer
  */ 
 static void printblock(void* bp){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
 
     size_t hsize, halloc, fsize, falloc;
 
@@ -255,6 +306,7 @@ static void printblock(void* bp){
 
     if (hsize == 0) {
 
+        SHOW_WARNING();
         printf("%p: EOL\n", bp);
         return;
     }
@@ -265,21 +317,10 @@ static void printblock(void* bp){
 }
 
 /**
- * @brief check block's validity
- */ 
-static void checkblock(void* bp){
-    
-    if((size_t)bp % 8){
-
-        printf("Error: %p is not doubleword aligned\n", bp);
-    }
-
-    if(GET(HDRP(bp)) != GET(FTRP(bp))){
-
-        printf("Error: header does not match footer\n");
-    }    
-}
-
+ * @brief checks each block's correctness on the heap
+ * 
+ * @param verbose a flag to show extra info of block
+ */
 static void checkheap(int verbose){
 
     char* bp = heap_listp;
@@ -291,6 +332,7 @@ static void checkheap(int verbose){
 
     if(GET_SIZE(HDRP(heap_listp)) != DSIZE || !GET_ALLOC(HDRP(heap_listp))){
 
+        SHOW_WARNING();
         printf("Bad prologue header\n");
     }
 
@@ -311,8 +353,47 @@ static void checkheap(int verbose){
 
     if(GET_SIZE(HDRP(bp)) || !GET_ALLOC(HDRP(bp))){
 
+        SHOW_WARNING();
         printf("Bad epilouge header\n");
     }
+}
+
+/**
+ * @brief check block's validity
+ */ 
+static void checkblock(void* bp){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    BLOCK_DETAIL(bp);
+    
+    if((size_t)bp % 8){
+
+        SHOW_WARNING();
+        printf("Error: %p is not doubleword aligned\n", bp);
+    }
+
+    if(GET(HDRP(bp)) != GET(FTRP(bp))){
+
+        SHOW_WARNING();
+        printf("Error: header does not match footer\n");
+    }    
+}
+
+/**
+ * @brief function for checking if the pointer is valid
+ * 
+ * @param bp data block pointer
+ * @return 0 if pointer bp is within the heap, -1 if it's not
+ */
+__inline static int checkheap_boundary(void* bp){
+
+    return (bp < mem_heap_lo()) ? -1 : 
+    ((char*)bp > (char*)mem_heap_hi() - 3 - SIZE_T_SIZE + WSIZE) ? -1 : 0;
 }
 
 /*********************************************************
@@ -323,6 +404,7 @@ static void checkheap(int verbose){
 * void* realloc(void* ptr, size_t size)
 * void mm_checkheap(void)
  ********************************************************/
+
 /* 
  * mm_init - initialize the malloc package.
  */
@@ -330,11 +412,12 @@ int mm_init(void){
 
     if((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1){
 
-        return -1;  // return -1 if exceed the boundary of heap
+        SHOW_WARNING();
+        return -1;
     }
 
     /* initialize 4 blocks */
-    PUT(heap_listp, 0);                             /* Alignment padding */
+    PUT(heap_listp, PACK(0, 0));                    /* Alignment padding */
     PUT(heap_listp + WSIZE, PACK(DSIZE, 1));        /* Prologue header */
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));    /* Prologue footer */
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));        /* Epilogue header */
@@ -344,12 +427,13 @@ int mm_init(void){
 
     /* next fit pointer */
     #if (REPLACEMENT == NEXT_FIT)
-         // rover = heap_listp;
+        rover = heap_listp;
     #endif
 
     /* each block will be at least 8 bytes */
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
 
+        SHOW_WARNING();
         return -1;
     }
 
@@ -364,11 +448,13 @@ void *mm_malloc(size_t size){
 
     if(heap_listp == NULL){
 
+        SHOW_WARNING();
         mm_init();
     }
 
     if(size <= 0){
 
+        SHOW_WARNING();
         return NULL;
     }
 
@@ -382,21 +468,32 @@ void *mm_malloc(size_t size){
     /* payload size plus header and footer */
     asize += DSIZE;
 
+    /* check alignment */
+    if(asize < size || asize % SIZE_T_SIZE != 0){
+
+        SHOW_WARNING();
+        return NULL;
+    }
+
+    /* find qualified free block */
     if((bp = find_fit(asize)) != NULL){
 
+        BLOCK_DETAIL(bp);
         place(bp, asize);
         return bp;
     }
 
-    /* if no fit found, then get external memory form kernel and plus block */
+    /* if no fit found, then get external memory form kernel and extend heap */
     extendsize = MAX(asize, CHUNKSIZE);
 
     if((bp = extend_heap(extendsize/WSIZE)) != NULL){
 
+        BLOCK_DETAIL(bp);
         place(bp, asize);
         return bp;
     }
 
+    SHOW_WARNING();
     return NULL;
 }
 
@@ -405,23 +502,27 @@ void *mm_malloc(size_t size){
  */
 void mm_free(void* bp){
 
-    /* error handles */
     if(bp == NULL){
 
-        return;
-    }
-
-    if((char*)bp < (char*)mem_heap_lo() || (char*)bp >= (char*)mem_heap_hi()){
-
+        SHOW_WARNING();
         return;
     }
 
     if(heap_listp == NULL){
 
+        SHOW_WARNING();
         mm_init();
     }
 
     size_t size = GET_SIZE(HDRP(bp));
+    size_t alloc = GET_ALLOC(HDRP(bp));
+
+    /* block must be previously allocated and within the range of heap */
+    if(alloc == 1 || !checkheap_boundary(bp)){
+
+        SHOW_WARNING();
+        return;
+    }
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -440,6 +541,7 @@ void *mm_realloc(void *ptr, size_t size){
     /* if size equal to zero then conduct mm_free() and return NULL */
     if(size == 0){
 
+        BLOCK_DETAIL(ptr);
         mm_free(ptr);
         return NULL;
     }
@@ -450,13 +552,18 @@ void *mm_realloc(void *ptr, size_t size){
         return mm_malloc(size);
     }
 
+    BLOCK_DETAIL(oldptr);
+
     /* allocate a new block */
     newptr = mm_malloc(size);
 
     if (newptr == NULL){
     
+        SHOW_WARNING();
         return NULL;
     }
+
+    BLOCK_DETAIL(newptr);
 
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
 
@@ -475,7 +582,10 @@ void *mm_realloc(void *ptr, size_t size){
         copySize = size;
     }
     
+    /* copy content to the new block */
     memcpy(newptr, oldptr, copySize);
+
+    /* free the old block */
     mm_free(oldptr);
     
     return newptr;
