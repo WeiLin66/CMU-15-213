@@ -96,11 +96,9 @@ team_t team = {
 * Macro for debugging message
  ********************************************************/
 
-#define SHOW_WARNING()  printf("[Warning] [File: %s] [Func: %s] [Line: %u]", \
-                                __FILE__, __FUNCTION__, __LINE__             \
-                        )
+#define SHOW_WARNING()      printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
 
-#define BLOCK_DETAIL(bp)  // printblock((bp))
+#define BLOCK_DETAIL(bp)    // printblock((bp))
 
 /*********************************************************
 * Global variables
@@ -515,14 +513,14 @@ void mm_free(void* bp){
     }
 
     size_t size = GET_SIZE(HDRP(bp));
-    size_t alloc = GET_ALLOC(HDRP(bp));
+    // size_t alloc = GET_ALLOC(HDRP(bp));
 
     /* block must be previously allocated and within the range of heap */
-    if(alloc == 1 || !checkheap_boundary(bp)){
+    // if(alloc == 1 || !checkheap_boundary(bp)){
 
-        SHOW_WARNING();
-        return;
-    }
+    //     SHOW_WARNING();
+    //     return;
+    // }
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -552,7 +550,7 @@ void *mm_realloc(void *ptr, size_t size){
         return mm_malloc(size);
     }
 
-    BLOCK_DETAIL(oldptr);
+    BLOCK_DETAIL(oldptr);  
 
     /* allocate a new block */
     newptr = mm_malloc(size);
@@ -563,24 +561,11 @@ void *mm_realloc(void *ptr, size_t size){
         return NULL;
     }
 
-    BLOCK_DETAIL(newptr);
-
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
 
-    /* simply extends original block payload by adjusting header and footer */
-    if(copySize - DSIZE >= size){
+    BLOCK_DETAIL(newptr);
 
-        PUT(HDRP(oldptr), PACK(size, 1));
-        PUT(FTRP(oldptr), PACK(size, 1));
-        
-        return oldptr;
-    }
-    
-    /* if the goal of mm_realloc() is to shrink block size */
-    if (size < copySize){
-        
-        copySize = size;
-    }
+    copySize = (copySize - DSIZE > size) ? size : copySize - DSIZE;
     
     /* copy content to the new block */
     memcpy(newptr, oldptr, copySize);

@@ -91,11 +91,11 @@ To get a list of the driver flags:
   - 模擬的記憶體系統
   
     - memlib.c模擬了一個虛擬的記憶體管理庫，裡頭包含
-      - mem_sbrk
-      - mem_heap_lo
-      - mem_heap_hi
-      - mem_heapsize
-      - mem_pagesize
+      - `mem_sbrk()`
+      - `mem_heap_lo()`
+      - `mem_heap_hi()`
+      - `mem_heapsize()`
+      - `mem_pagesize()`
   - 編寫規則
   
     - 不要更改`mm.h`中的結構，實驗建議在`mm.c`中編寫static functions
