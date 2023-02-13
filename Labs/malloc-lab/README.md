@@ -112,11 +112,13 @@ To get a list of the driver flags:
       - 用於驗證`mm.c`的正確性、記憶體使用率、吞吐量
       - 執行驗證時會測試程式的正確性、記憶體使用效率、效能等
       - 輸入指令參數
+        - -a 不要檢查team structure (交作業的個人信息)
+        - -g 生成總結信息
         - -t <tracedir>使用指定地址內的trace files
         - -f <tracefile>使用指定的trace file
         - -c <tracefile>只執行trace file一次，目的在於驗證正確性。便於debug
         - -h 打印所有指令參數
-        - -l 執行libc版本的malloc，比對跟我們編寫的分配器之間效能差距
+        - -l 執行libc版本的m-alloc，比對跟我們編寫的分配器之間效能差距
         - -V 打印詳細執行信息
         - -v <verbose level>手動設定打印消息等級
         - -d \<i\>設定debug等級
