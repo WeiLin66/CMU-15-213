@@ -98,7 +98,7 @@ team_t team = {
 
 #define SHOW_WARNING()      printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
 
-#define BLOCK_DETAIL(bp)    // printblock((bp))
+#define BLOCK_DETAIL(bp)    printblock((bp))
 
 /*********************************************************
 * Global variables
@@ -166,8 +166,6 @@ static void place(void* bp, size_t asize){
         return;
     }
 
-    BLOCK_DETAIL(bp);
-
     size_t size = GET_SIZE(HDRP(bp));
 
     if((size - asize) >= MINIMUN_BLOCK){ // split
@@ -202,7 +200,6 @@ static void* find_fit(size_t asize){
 
             if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
 
-                BLOCK_DETAIL(bp);
                 return bp;
             }
         }
@@ -231,8 +228,6 @@ static void* coalesce(void* bp){
         return bp;
     }
 
-    BLOCK_DETAIL(bp);
-
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
@@ -251,7 +246,6 @@ static void* coalesce(void* bp){
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
 
-        BLOCK_DETAIL(bp);        
     }
     /* case 3: next block is free */
     else if(prev_alloc && !next_alloc){
@@ -270,7 +264,6 @@ static void* coalesce(void* bp){
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
 
-        BLOCK_DETAIL(bp);
     }
 
     #if (REPLACEMENT == NEXT_FIT)
@@ -366,8 +359,6 @@ static void checkblock(void* bp){
         SHOW_WARNING();
         return;
     }
-
-    BLOCK_DETAIL(bp);
     
     if((size_t)bp % 8){
 
@@ -476,7 +467,6 @@ void *mm_malloc(size_t size){
     /* find qualified free block */
     if((bp = find_fit(asize)) != NULL){
 
-        BLOCK_DETAIL(bp);
         place(bp, asize);
         return bp;
     }
@@ -486,7 +476,6 @@ void *mm_malloc(size_t size){
 
     if((bp = extend_heap(extendsize/WSIZE)) != NULL){
 
-        BLOCK_DETAIL(bp);
         place(bp, asize);
         return bp;
     }
@@ -513,14 +502,14 @@ void mm_free(void* bp){
     }
 
     size_t size = GET_SIZE(HDRP(bp));
-    // size_t alloc = GET_ALLOC(HDRP(bp));
+    size_t alloc = GET_ALLOC(HDRP(bp));
 
     /* block must be previously allocated and within the range of heap */
-    // if(alloc == 1 || !checkheap_boundary(bp)){
+    if(alloc == 0 || checkheap_boundary(bp)){
 
-    //     SHOW_WARNING();
-    //     return;
-    // }
+        SHOW_WARNING();
+        return;
+    }
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -539,7 +528,6 @@ void *mm_realloc(void *ptr, size_t size){
     /* if size equal to zero then conduct mm_free() and return NULL */
     if(size == 0){
 
-        BLOCK_DETAIL(ptr);
         mm_free(ptr);
         return NULL;
     }
@@ -549,8 +537,6 @@ void *mm_realloc(void *ptr, size_t size){
 
         return mm_malloc(size);
     }
-
-    BLOCK_DETAIL(oldptr);  
 
     /* allocate a new block */
     newptr = mm_malloc(size);
@@ -562,9 +548,7 @@ void *mm_realloc(void *ptr, size_t size){
     }
 
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
-
-    BLOCK_DETAIL(newptr);
-
+    
     copySize = (copySize - DSIZE > size) ? size : copySize - DSIZE;
     
     /* copy content to the new block */
