@@ -184,4 +184,3 @@ To get a list of the driver flags:
 
 ### 分離式空閒列表
 - LIFO + first fit
-- LIFO + best fit
