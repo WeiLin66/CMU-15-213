@@ -43,7 +43,7 @@ team_t team = {
 #define IMPLICIT                                    0
 #define EXPLICIT                                    1
 #define SEGEGRATE                                   2
-#define STRUCTURE                                   IMPLICIT
+#define STRUCTURE                                   EXPLICIT
 
 #if (STRUCTURE == EXPLICIT)
 static char* exlicit_free_list_head = NULL;
@@ -55,7 +55,7 @@ static char* exlicit_free_list_head = NULL;
 #define FIRST_FIT                                   0
 #define NEXT_FIT                                    1
 #define BEST_FIT                                    2
-#define REPLACEMENT                                 BEST_FIT
+#define REPLACEMENT                                 FIRST_FIT
 
 /*********************************************************
 * Macros for block operation
@@ -89,15 +89,21 @@ static char* exlicit_free_list_head = NULL;
 /* get previous block's footer */
 #define PREV_FTRP(bp)                               ((char *)(bp) - DSIZE)
 
+/* strategies for maintaining free list */
+#if (STRUCTURE == EXPLICIT)
+#define INSERT(bp)                                  LIFO_insert_free_blk(bp)
+#define REMOVE(bp)                                  LIFO_remove_free_blk(bp)
+#endif
+
 /*********************************************************
 * Macros for getting and setting explicit block's pointers
  ********************************************************/
 
 #if (STRUCTURE == EXPLICIT)
-#define GET_NEXT_FREE_BLKP(bp)                          (*(char **)(bp))
-#define GET_PREV_FREE_BLKP(bp)                          (*((char **)(bp) + 1))
-#define PUT_NEXT_FREE_BLKP(bp, val)                     (*(unsigned int *)(bp) = (unsigned int)(val))
-#define PUT_PREV_FREE_BLKP(bp, val)                     (*((unsigned int *)(bp) + 1) = (unsigned int)(val))
+#define GET_NEXT_FREE_BLKP(bp)                      ((void *)(*(unsigned int *)(bp)))
+#define GET_PREV_FREE_BLKP(bp)                      ((void *)(*((unsigned int *)(bp) + 1)))
+#define PUT_NEXT_FREE_BLKP(bp, val)                 (*(unsigned int *)(bp) = (unsigned int)(val))
+#define PUT_PREV_FREE_BLKP(bp, val)                 (*((unsigned int *)(bp) + 1) = (unsigned int)(val))
 #endif
 
 /*********************************************************
@@ -105,31 +111,24 @@ static char* exlicit_free_list_head = NULL;
  ********************************************************/
 
 /* single word (4) or double word (8) alignment */
-#define ALIGNMENT               DSIZE
+#define ALIGNMENT                                   DSIZE
 
 /* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size)             (((size) + (ALIGNMENT-1)) & ~0x7)
+#define ALIGN(size)                                 (((size) + (ALIGNMENT-1)) & ~0x7)
 
 /* alignment size define */
-#define SIZE_T_SIZE             (ALIGN(sizeof(size_t)))
-
-/* explicit list contains two extra pointers */
-#if (STRUCTURE == EXPLICIT)
-#define  EXTRA_LENGTH           DSIZE
-#else
-#define  EXTRA_LENGTH           0
-#endif
+#define SIZE_T_SIZE                                 (ALIGN(sizeof(size_t)))
 
 /* minimun alignment block size */
-#define MINIMUN_BLOCK           DSIZE + SIZE_T_SIZE + EXTRA_LENGTH
+#define MINIMUN_BLOCK                               DSIZE + SIZE_T_SIZE
 
 /*********************************************************
 * Macros for debugging message
  ********************************************************/
 
-#define SHOW_WARNING()      printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
+#define SHOW_WARNING()                              printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
 
-#define BLOCK_DETAIL(bp)    printblock((bp))
+#define BLOCK_DETAIL(bp)                            // printblock((bp))
 
 /*********************************************************
 * Global variables
@@ -154,9 +153,8 @@ static void checkheap(int verbose);
 static void checkblock(void* bp);
 __inline static int checkheap_boundary(void* bp);
 #if (STRUCTURE == EXPLICIT)
-static void insert(void* bp);
-static void remove(void* bp);
-static void checklist(int verbose);
+static void LIFO_insert_free_blk(void* bp);
+static void LIFO_remove_free_blk(void* bp);
 #endif
 
 /**
@@ -185,9 +183,9 @@ static void* extend_heap(size_t words){
     PUT(FTRP(bp), PACK(size, 0));           // footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
 
-#if (STRCTURE == EXPLICIT)
-    PUT_NEXT_FREE_BLKP(bp, 0);
-    PUT_PREV_FREE_BLKP(bp, 0);
+#if (STRUCTURE == EXPLICIT)
+    PUT_NEXT_FREE_BLKP(bp, 0);  // next pointer
+    PUT_PREV_FREE_BLKP(bp, 0);  // previous pointer
 #endif
 
     return coalesce(bp);    // the end of the previous block could be free
@@ -218,7 +216,7 @@ static void place(void* bp, size_t asize){
         PUT(FTRP(bp), PACK(asize, 1));
 
 #if (STRUCTURE == EXPLICIT)
-        remove(bp);
+        REMOVE(bp);
 #endif
 
         bp = NEXT_BLKP(bp);
@@ -228,7 +226,7 @@ static void place(void* bp, size_t asize){
         PUT(FTRP(bp), PACK((size-asize), 0));
 
 #if (STRUCTURE == EXPLICIT)
-        insert(bp);
+        INSERT(bp);
 #endif
     }
     /* no need for spliting */
@@ -238,7 +236,7 @@ static void place(void* bp, size_t asize){
         PUT(FTRP(bp), PACK(size, 1));
 
 #if (STRUCTURE == EXPLICIT)
-        remove(bp);
+        REMOVE(bp);
 #endif
     }
 }
@@ -285,7 +283,7 @@ static void* find_fit(size_t asize){
     /* search from start of list to old rover */
     for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover)){
 #elif (STRUCTURE == EXPLICIT)
-    for(rover = exlicit_free_list_head; rover != NULL; rover = GET_NEXT_FREE_BLKP(rover)){
+    for(rover = exlicit_free_list_head; rover < oldrover; rover = GET_NEXT_FREE_BLKP(rover)){
 #endif
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
         
@@ -349,7 +347,7 @@ static void* coalesce(void* bp){
     else if(!prev_alloc && next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-        remove(PREV_BLKP(bp));
+        REMOVE(PREV_BLKP(bp));
 #endif          
         size += GET_SIZE(PREV_FTRP(bp));
 
@@ -361,7 +359,7 @@ static void* coalesce(void* bp){
     else if(prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-        remove(PREV_BLKP(NEXT_BLKP(bp)));
+        REMOVE(PREV_BLKP(NEXT_BLKP(bp)));
 #endif           
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
@@ -372,8 +370,8 @@ static void* coalesce(void* bp){
     else if(!prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-        remove(PREV_BLKP(bp));
-        remove(PREV_BLKP(NEXT_BLKP(bp)));
+        REMOVE(PREV_BLKP(bp));
+        REMOVE(PREV_BLKP(NEXT_BLKP(bp)));
 #endif
         size += GET_SIZE(PREV_FTRP(bp)) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
@@ -383,14 +381,17 @@ static void* coalesce(void* bp){
     }
 
 #if (REPLACEMENT == NEXT_FIT)
+#if (STRUCTURE == IMPLICIT)
     if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp))){
-    
+#elif (STRUCTURE == EXPLICIT)
+    if (1){
+#endif
         rover = bp;
     }
 #endif
 
 #if (STRUCTURE == EXPLICIT)
-    insert(bp); // insert block to free list
+    INSERT(bp); // insert block to free list
 #endif  
 
     return bp;
@@ -514,7 +515,7 @@ __inline static int checkheap_boundary(void* bp){
  * 
  * @param bp data block address
  */
-static void insert(void* bp){
+static void LIFO_insert_free_blk(void* bp){
 
     if(bp == NULL){
 
@@ -523,14 +524,22 @@ static void insert(void* bp){
     }
 
     /* LIFO */
+    PUT_PREV_FREE_BLKP(bp, 0);
+
     if(exlicit_free_list_head != NULL){
 
-        /* adjust next block pointers */
-        PUT_PREV_FREE_BLKP(exlicit_free_list_head, bp);  // NULL --> bp
+        if(bp == (char*)0xd0d0d0d0 || exlicit_free_list_head == (char*)0xd0d0d0d0){
 
-        /* adjust current block */
-        PUT_PREV_FREE_BLKP(bp, 0);  // NULL
+            printf("[illegal address] [line: %u]\n", __LINE__);
+            checkheap(1);
+            exit(-1);
+        }
+
+        PUT_PREV_FREE_BLKP(exlicit_free_list_head, bp);
         PUT_NEXT_FREE_BLKP(bp, exlicit_free_list_head);
+    }else{
+
+        PUT_NEXT_FREE_BLKP(bp, 0);
     }
 
     exlicit_free_list_head = bp;
@@ -541,7 +550,7 @@ static void insert(void* bp){
  * 
  * @param bp data block address
  */
-static void remove(void* bp){
+static void LIFO_remove_free_blk(void* bp){
 
     if(bp == NULL){
 
@@ -556,38 +565,29 @@ static void remove(void* bp){
     }
 
     /* LIFO */
-    unsigned int* old_bp = exlicit_free_list_head;
-    unsigned int* next_bp = GET_NEXT_FREE_BLKP(exlicit_free_list_head);
+    char* prev = GET_PREV_FREE_BLKP(bp);
+    char* next = GET_NEXT_FREE_BLKP(bp);
 
-    PUT_PREV_FREE_BLKP(next_bp, 0);
-    exlicit_free_list_head = next_bp;
+    if(prev == (char*)0xd0d0d0d0 || next == (char*)0xd0d0d0d0){
 
-    PUT_NEXT_FREE_BLKP(old_bp, 0);
-}
+        printf("[illegal address] [line: %u]\n", __LINE__);
+        checkheap(1);
+        exit(-1);
+    }    
 
-/**
- * @brief check free list's correctness
- * 
- * @param verbose a flag to show extra info of block
- */ 
-static void checklist(int verbose){
+    if(prev != NULL){
 
-    if(bp == NULL){
-
-        SHOW_WARNING();
-        return;
+        PUT_NEXT_FREE_BLKP(prev, next);
     }
 
-    char* bp = exlicit_free_list_head;
+    if(next != NULL){
 
-    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+        PUT_PREV_FREE_BLKP(next, prev);
+    }
 
-        if(verbose){
+    if(bp == exlicit_free_list_head){
 
-            printblock(bp);
-        }
-
-        checkblock(bp);        
+        exlicit_free_list_head = GET_NEXT_FREE_BLKP(bp);
     }
 }
 #endif
@@ -623,7 +623,13 @@ int mm_init(void){
 
     /* next fit pointer */
 #if (REPLACEMENT == NEXT_FIT)
+
+#if (STRUCTURE == IMPLICIT)
     rover = heap_listp;
+#elif (STRUCTURE == EXPLICIT)
+    rover = exlicit_free_list_head;
+#endif
+
 #endif
 
     /* each block will be at least 8 bytes */
@@ -632,7 +638,7 @@ int mm_init(void){
         SHOW_WARNING();
         return -1;
     }
-
+    
     return 0;
 }
 
@@ -664,9 +670,6 @@ void *mm_malloc(size_t size){
     /* payload size plus header and footer */
     asize += DSIZE;
 
-    /* plus next and previous pointers */
-    asize += EXTRA_LENGTH;
-
     /* check alignment */
     if(asize < size || asize % SIZE_T_SIZE != 0){
 
@@ -678,7 +681,7 @@ void *mm_malloc(size_t size){
     if((bp = find_fit(asize)) != NULL){
 
         place(bp, asize);
-        return bp + EXTRA_LENGTH;
+        return bp;
     }
 
     /* if no fit found, then get external memory form kernel and extend heap */
@@ -687,7 +690,7 @@ void *mm_malloc(size_t size){
     if((bp = extend_heap(extendsize/WSIZE)) != NULL){
 
         place(bp, asize);
-        return bp + EXTRA_LENGTH;
+        return bp;
     }
 
     SHOW_WARNING();
@@ -710,8 +713,6 @@ void mm_free(void* bp){
         SHOW_WARNING();
         mm_init();
     }
-
-    bp = (char*)bp - EXTRA_LENGTH;
 
     size_t size = GET_SIZE(HDRP(bp));
     size_t alloc = GET_ALLOC(HDRP(bp));
@@ -764,7 +765,7 @@ void *mm_realloc(void *ptr, size_t size){
 
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
 
-    copySize = (copySize - DSIZE - EXTRA_LENGTH > size) ? size : copySize - DSIZE - EXTRA_LENGTH;
+    copySize = (copySize - DSIZE > size) ? size : copySize - DSIZE;
     
     /* copy content to the new block */
     memcpy(newptr, oldptr, copySize);
