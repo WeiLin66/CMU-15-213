@@ -94,10 +94,10 @@ static char* exlicit_free_list_head = NULL;
  ********************************************************/
 
 #if (STRUCTURE == EXPLICIT)
-#define GET_NEXT_FREE_BLKP(bp)                          (*(unsigned int *)(bp))
-#define GET_PREV_FREE_BLKP(bp)                          (*((unsigned int *)(bp) + 1))
-#define PUT_NEXT_FREE_BLKP(bp, val)                     (*(unsigned int *)(bp) = (val))
-#define PUT_PREV_FREE_BLKP(bp, val)                     (*((unsigned int *)(bp) + 1) = (val))
+#define GET_NEXT_FREE_BLKP(bp)                          (*(char **)(bp))
+#define GET_PREV_FREE_BLKP(bp)                          (*((char **)(bp) + 1))
+#define PUT_NEXT_FREE_BLKP(bp, val)                     (*(unsigned int *)(bp) = (unsigned int)(val))
+#define PUT_PREV_FREE_BLKP(bp, val)                     (*((unsigned int *)(bp) + 1) = (unsigned int)(val))
 #endif
 
 /*********************************************************
