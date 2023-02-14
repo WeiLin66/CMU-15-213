@@ -42,8 +42,12 @@ team_t team = {
 
 #define IMPLICIT                                    0
 #define EXPLICIT                                    1
+#define SEGEGRATE                                   2
 #define STRUCTURE                                   IMPLICIT
 
+#if (STRUCTURE == EXPLICIT)
+static char* exlicit_free_list_head = NULL;
+#endif
 /*********************************************************
 * Macros for replacement policies
  ********************************************************/
@@ -51,7 +55,7 @@ team_t team = {
 #define FIRST_FIT                                   0
 #define NEXT_FIT                                    1
 #define BEST_FIT                                    2
-#define REPLACEMENT                                 NEXT_FIT
+#define REPLACEMENT                                 BEST_FIT
 
 /*********************************************************
 * Macros for block operation
@@ -152,6 +156,7 @@ __inline static int checkheap_boundary(void* bp);
 #if (STRUCTURE == EXPLICIT)
 static void insert(void* bp);
 static void remove(void* bp);
+static void checklist(int verbose);
 #endif
 
 /**
@@ -181,8 +186,8 @@ static void* extend_heap(size_t words){
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
 
 #if (STRCTURE == EXPLICIT)
-    PUT_NEXT_FREE_BLKP(bp, 0)               // set next pointer to NULL
-    PUT_PREV_FREE_BLKP(bp, 0)               // set previous pointer to NULL
+    PUT_NEXT_FREE_BLKP(bp, 0);
+    PUT_PREV_FREE_BLKP(bp, 0);
 #endif
 
     return coalesce(bp);    // the end of the previous block could be free
@@ -205,21 +210,36 @@ static void place(void* bp, size_t asize){
 
     size_t size = GET_SIZE(HDRP(bp));
 
-    if((size - asize) >= MINIMUN_BLOCK){ // split
+    /* split */
+    if((size - asize) >= MINIMUN_BLOCK){
 
         /* current block */
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
+
+#if (STRUCTURE == EXPLICIT)
+        remove(bp);
+#endif
 
         bp = NEXT_BLKP(bp);
 
         /* new block */
         PUT(HDRP(bp), PACK((size-asize), 0));
         PUT(FTRP(bp), PACK((size-asize), 0));
-    }else{ // no need for spliting
+
+#if (STRUCTURE == EXPLICIT)
+        insert(bp);
+#endif
+    }
+    /* no need for spliting */
+    else{
 
         PUT(HDRP(bp), PACK(size, 1));
         PUT(FTRP(bp), PACK(size, 1));
+
+#if (STRUCTURE == EXPLICIT)
+        remove(bp);
+#endif
     }
 }
 
@@ -231,10 +251,14 @@ static void place(void* bp, size_t asize){
 static void* find_fit(size_t asize){
 
 #if (REPLACEMENT == FIRST_FIT)
-    void* bp = NULL;
+    char* bp = heap_listp;
 
-    for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
-
+#if (STRUCTURE == IMPLICIT)
+    for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
+#elif (STRUCTURE == EXPLICIT)
+    bp = exlicit_free_list_head;
+    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+#endif
         if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
 
             return bp;
@@ -245,18 +269,24 @@ static void* find_fit(size_t asize){
 #elif (REPLACEMENT == NEXT_FIT)
     char *oldrover = rover;
 
+#if (STRUCTURE == IMPLICIT)
     /* Search from the rover to the end of list */
-    for ( ; GET_SIZE(HDRP(rover)) > 0; rover = NEXT_BLKP(rover)){
-        
+    for (; GET_SIZE(HDRP(rover)) > 0; rover = NEXT_BLKP(rover)){
+#elif (STRUCTURE == EXPLICIT)
+    for(; rover != NULL; rover = GET_NEXT_FREE_BLKP(rover)){
+#endif
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
             
             return rover;
         }
     }
 
+#if (STRUCTURE == IMPLICIT)
     /* search from start of list to old rover */
     for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover)){
-        
+#elif (STRUCTURE == EXPLICIT)
+    for(rover = exlicit_free_list_head; rover != NULL; rover = GET_NEXT_FREE_BLKP(rover)){
+#endif
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
         
             return rover;
@@ -268,8 +298,12 @@ static void* find_fit(size_t asize){
     char* bp = heap_listp;
     char* minibp = NULL;
 
-    for(; GET_SIZE(HDRP(bp))>0; bp = NEXT_BLKP(bp)){
-
+#if (STRUCTURE == IMPLICIT)
+    for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
+#elif (STRUCTURE == EXPLICIT)
+    bp = exlicit_free_list_head;
+    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+#endif
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
             
             if(minibp == NULL){
@@ -309,13 +343,13 @@ static void* coalesce(void* bp){
     /* case 1: none of the previos and next blocks aren free */
     if(prev_alloc && next_alloc){
         
-        return bp;
+        // no need for coalescing
     }
     /* case 2: previous block is free */
     else if(!prev_alloc && next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(bp));
+        remove(PREV_BLKP(bp));
 #endif          
         size += GET_SIZE(PREV_FTRP(bp));
 
@@ -327,7 +361,7 @@ static void* coalesce(void* bp){
     else if(prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(NEXT_BLKP(bp)));
+        remove(PREV_BLKP(NEXT_BLKP(bp)));
 #endif           
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
@@ -338,8 +372,8 @@ static void* coalesce(void* bp){
     else if(!prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-    remove(PREV_BLKP(bp));
-    remove(PREV_BLKP(NEXT_BLKP(bp)));
+        remove(PREV_BLKP(bp));
+        remove(PREV_BLKP(NEXT_BLKP(bp)));
 #endif
         size += GET_SIZE(PREV_FTRP(bp)) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
@@ -482,7 +516,24 @@ __inline static int checkheap_boundary(void* bp){
  */
 static void insert(void* bp){
 
-    // need implementation
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    /* LIFO */
+    if(exlicit_free_list_head != NULL){
+
+        /* adjust next block pointers */
+        PUT_PREV_FREE_BLKP(exlicit_free_list_head, bp);  // NULL --> bp
+
+        /* adjust current block */
+        PUT_PREV_FREE_BLKP(bp, 0);  // NULL
+        PUT_NEXT_FREE_BLKP(bp, exlicit_free_list_head);
+    }
+
+    exlicit_free_list_head = bp;
 }
 
 /**
@@ -492,7 +543,52 @@ static void insert(void* bp){
  */
 static void remove(void* bp){
 
-    // need implementation
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    if(exlicit_free_list_head == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    /* LIFO */
+    unsigned int* old_bp = exlicit_free_list_head;
+    unsigned int* next_bp = GET_NEXT_FREE_BLKP(exlicit_free_list_head);
+
+    PUT_PREV_FREE_BLKP(next_bp, 0);
+    exlicit_free_list_head = next_bp;
+
+    PUT_NEXT_FREE_BLKP(old_bp, 0);
+}
+
+/**
+ * @brief check free list's correctness
+ * 
+ * @param verbose a flag to show extra info of block
+ */ 
+static void checklist(int verbose){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    char* bp = exlicit_free_list_head;
+
+    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+
+        if(verbose){
+
+            printblock(bp);
+        }
+
+        checkblock(bp);        
+    }
 }
 #endif
 
@@ -568,6 +664,9 @@ void *mm_malloc(size_t size){
     /* payload size plus header and footer */
     asize += DSIZE;
 
+    /* plus next and previous pointers */
+    asize += EXTRA_LENGTH;
+
     /* check alignment */
     if(asize < size || asize % SIZE_T_SIZE != 0){
 
@@ -579,7 +678,7 @@ void *mm_malloc(size_t size){
     if((bp = find_fit(asize)) != NULL){
 
         place(bp, asize);
-        return bp;
+        return bp + EXTRA_LENGTH;
     }
 
     /* if no fit found, then get external memory form kernel and extend heap */
@@ -588,7 +687,7 @@ void *mm_malloc(size_t size){
     if((bp = extend_heap(extendsize/WSIZE)) != NULL){
 
         place(bp, asize);
-        return bp;
+        return bp + EXTRA_LENGTH;
     }
 
     SHOW_WARNING();
@@ -612,6 +711,8 @@ void mm_free(void* bp){
         mm_init();
     }
 
+    bp = (char*)bp - EXTRA_LENGTH;
+
     size_t size = GET_SIZE(HDRP(bp));
     size_t alloc = GET_ALLOC(HDRP(bp));
 
@@ -626,7 +727,7 @@ void mm_free(void* bp){
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
 
-    /* merge blocks(if any) */
+    /* coalescing blocks(if any) */
     coalesce(bp);    
 }
 
@@ -663,7 +764,7 @@ void *mm_realloc(void *ptr, size_t size){
 
     copySize = GET_SIZE(HDRP(oldptr)); // get old block size
 
-    copySize = (copySize - DSIZE > size) ? size : copySize - DSIZE;
+    copySize = (copySize - DSIZE - EXTRA_LENGTH > size) ? size : copySize - DSIZE - EXTRA_LENGTH;
     
     /* copy content to the new block */
     memcpy(newptr, oldptr, copySize);
