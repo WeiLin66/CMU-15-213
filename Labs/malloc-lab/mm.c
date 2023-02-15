@@ -45,16 +45,15 @@ team_t team = {
 #define SEGEGRATE                                   2
 #define STRUCTURE                                   EXPLICIT
 
-#if (STRUCTURE == EXPLICIT)
-static char* exlicit_free_list_head = NULL;
-#endif
 /*********************************************************
 * Macros for replacement policies
  ********************************************************/
 
 #define FIRST_FIT                                   0
-#define NEXT_FIT                                    1
-#define BEST_FIT                                    2
+#define BEST_FIT                                    1
+#if (STRUCTURE == IMPLICIT)
+#define NEXT_FIT                                    2
+#endif
 #define REPLACEMENT                                 BEST_FIT
 
 /*********************************************************
@@ -141,8 +140,12 @@ static char* exlicit_free_list_head = NULL;
 
 static char* heap_listp = NULL;
 
-#if (REPLACEMENT == NEXT_FIT)
+#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
 static char* rover = NULL;
+#endif
+
+#if (STRUCTURE == EXPLICIT)
+static char* explicit_free_list_head = NULL;
 #endif
 
 /*********************************************************
@@ -259,7 +262,7 @@ static void* find_fit(size_t asize){
 #if (STRUCTURE == IMPLICIT)
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 #elif (STRUCTURE == EXPLICIT)
-    bp = exlicit_free_list_head;
+    bp = explicit_free_list_head;
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #endif
         if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
@@ -269,27 +272,21 @@ static void* find_fit(size_t asize){
     }
 
     return NULL; /* No fit found */
-#elif (REPLACEMENT == NEXT_FIT)
+#elif defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
     char *oldrover = rover;
 
-#if (STRUCTURE == IMPLICIT)
     /* Search from the rover to the end of list */
     for (; GET_SIZE(HDRP(rover)) > 0; rover = NEXT_BLKP(rover)){
-#elif (STRUCTURE == EXPLICIT)
-    for(; rover != NULL; rover = GET_NEXT_FREE_BLKP(rover)){
-#endif
+
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
             
             return rover;
         }
     }
 
-#if (STRUCTURE == IMPLICIT)
     /* search from start of list to old rover */
     for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover)){
-#elif (STRUCTURE == EXPLICIT)
-    for(rover = exlicit_free_list_head; rover < oldrover; rover = GET_NEXT_FREE_BLKP(rover)){
-#endif
+
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
         
             return rover;
@@ -304,7 +301,7 @@ static void* find_fit(size_t asize){
 #if (STRUCTURE == IMPLICIT)
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 #elif (STRUCTURE == EXPLICIT)
-    bp = exlicit_free_list_head;
+    bp = explicit_free_list_head;
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #endif
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
@@ -384,12 +381,9 @@ static void* coalesce(void* bp){
         bp = PREV_BLKP(bp);   
     }
 
-#if (REPLACEMENT == NEXT_FIT)
-#if (STRUCTURE == IMPLICIT)
+#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
     if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp))){
-#elif (STRUCTURE == EXPLICIT)
-    if (1){
-#endif
+
         rover = bp;
     }
 #endif
@@ -532,16 +526,16 @@ static void LIFO_insert_free_blk(void* bp){
     /* LIFO */
     PUT_PREV_FREE_BLKP(bp, 0);
 
-    if(exlicit_free_list_head != NULL){
+    if(explicit_free_list_head != NULL){
 
-        PUT_PREV_FREE_BLKP(exlicit_free_list_head, bp);
-        PUT_NEXT_FREE_BLKP(bp, exlicit_free_list_head);
+        PUT_PREV_FREE_BLKP(explicit_free_list_head, bp);
+        PUT_NEXT_FREE_BLKP(bp, explicit_free_list_head);
     }else{
 
         PUT_NEXT_FREE_BLKP(bp, 0);
     }
 
-    exlicit_free_list_head = bp;
+    explicit_free_list_head = bp;
 }
 
 /**
@@ -557,7 +551,7 @@ static void LIFO_remove_free_blk(void* bp){
         return;
     }
 
-    if(exlicit_free_list_head == NULL){
+    if(explicit_free_list_head == NULL){
 
         SHOW_WARNING();
         return;
@@ -577,16 +571,16 @@ static void LIFO_remove_free_blk(void* bp){
         PUT_PREV_FREE_BLKP(next, prev);
     }
 
-    if(bp == exlicit_free_list_head){
+    if(bp == explicit_free_list_head){
 
-        exlicit_free_list_head = GET_NEXT_FREE_BLKP(bp);
+        explicit_free_list_head = GET_NEXT_FREE_BLKP(bp);
     }   
 }
 
 #if (STRUCTURE == EXPLICIT)
 static void freelist_checker(void){
 
-    char* ptr = exlicit_free_list_head;
+    char* ptr = explicit_free_list_head;
 
     size_t hsize, halloc, fsize, falloc;
     char* nblk = NULL, *pblk = NULL;
@@ -651,18 +645,12 @@ int mm_init(void){
     heap_listp += (2*WSIZE);
 
 #if (STRUCTURE == EXPLICIT)
-    exlicit_free_list_head = NULL;
+    explicit_free_list_head = NULL;
 #endif
 
     /* next fit pointer */
-#if (REPLACEMENT == NEXT_FIT)
-
-#if (STRUCTURE == IMPLICIT)
+#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
     rover = heap_listp;
-#elif (STRUCTURE == EXPLICIT)
-    rover = exlicit_free_list_head;
-#endif
-
 #endif
 
     /* each block will be at least 8 bytes */
