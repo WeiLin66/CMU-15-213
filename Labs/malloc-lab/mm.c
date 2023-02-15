@@ -42,8 +42,8 @@ team_t team = {
 
 #define IMPLICIT                                    0
 #define EXPLICIT                                    1
-#define SEGEGRATE                                   2
-#define STRUCTURE                                   EXPLICIT
+#define SEGREGATE                                   2
+#define STRUCTURE                                   SEGREGATE
 
 /*********************************************************
 * Macros for replacement policies
@@ -54,7 +54,7 @@ team_t team = {
 #if (STRUCTURE == IMPLICIT)
 #define NEXT_FIT                                    2
 #endif
-#define REPLACEMENT                                 BEST_FIT
+#define REPLACEMENT                                 FIRST_FIT
 
 /*********************************************************
 * Macros for block operation
@@ -90,15 +90,18 @@ team_t team = {
 
 /* strategies for maintaining free list */
 #if (STRUCTURE == EXPLICIT)
-#define INSERT(bp)                                  LIFO_insert_free_blk(bp)
-#define REMOVE(bp)                                  LIFO_remove_free_blk(bp)
+#define INSERT(bp)                                  explicit_insert_free_blk(bp)
+#define REMOVE(bp)                                  explicit_remove_free_blk(bp)
+#elif (STRUCTURE == SEGREGATE)
+#define INSERT(bp)                                  segregate_insert_free_blk(bp)
+#define REMOVE(bp)                                  segregate_remove_free_blk(bp)
 #endif
 
 /*********************************************************
 * Macros for getting and setting explicit block's pointers
  ********************************************************/
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
 #define GET_NEXT_FREE_BLKP(bp)                      ((void *)(*(unsigned int *)(bp)))
 #define GET_PREV_FREE_BLKP(bp)                      ((void *)(*((unsigned int *)(bp) + 1)))
 #define PUT_NEXT_FREE_BLKP(bp, val)                 (*(unsigned int *)(bp) = (unsigned int)(val))
@@ -122,17 +125,29 @@ team_t team = {
 #define MINIMUN_BLOCK                               DSIZE + SIZE_T_SIZE
 
 /*********************************************************
+* Macros for maintaining segregated list
+ ********************************************************/
+
+#if (STRUCTURE == SEGREGATE)
+#define SEGREGATE_CASE_NUM                          9
+#define SEGREGATE_LIST_PADDING                      WSIZE * (SEGREGATE_CASE_NUM - 1)
+#define GET_CASE_HEAD(case)                         ((void *)((char *)heap_listp - (SEGREGATE_CASE_NUM + 1)*WSIZE + (case)*WSIZE))
+#else
+#define SEGREGATE_LIST_PADDING                      0
+#endif
+
+/*********************************************************
 * Macros for debugging message
  ********************************************************/
 
 #define SHOW_WARNING()                              printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
 
-#define BLOCK_DETAIL(bp)                            // printblock((bp))
+#define BLOCK_DETAIL(bp)                            printblock((bp))
 
 #if (STRUCTURE == EXPLICIT)
 #define FREE_LIST_DETAIL()                          freelist_checker()
-#else
-#define FREE_LIST_DETAIL()                          
+#elif (STRUCTURE == SEGREGATE)
+#define FREE_LIST_DETAIL()                          caselist_checker()                      
 #endif
 /*********************************************************
 * Global variables
@@ -160,10 +175,16 @@ static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
 __inline static int checkheap_boundary(void* bp);
+
 #if (STRUCTURE == EXPLICIT)
-static void LIFO_insert_free_blk(void* bp);
-static void LIFO_remove_free_blk(void* bp);
+static void explicit_insert_free_blk(void* bp);
+static void explicit_remove_free_blk(void* bp);
 static void freelist_checker(void);
+#elif (STRUCTURE == SEGREGATE)
+static int segregate_case_chooser(int size);
+static void segregate_insert_free_blk(void* bp);
+static void segregate_remove_free_blk(void* bp);
+static void caselist_checker(void);
 #endif
 
 /**
@@ -188,11 +209,11 @@ static void* extend_heap(size_t words){
         return NULL;
     }
 
-    PUT(HDRP(bp), PACK(size, 0));           // header
-    PUT(FTRP(bp), PACK(size, 0));           // footer
+    PUT(HDRP(bp), PACK(size, 0));           // Header
+    PUT(FTRP(bp), PACK(size, 0));           // Footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
     PUT_NEXT_FREE_BLKP(bp, 0);  // next pointer
     PUT_PREV_FREE_BLKP(bp, 0);  // previous pointer
 #endif
@@ -220,7 +241,7 @@ static void place(void* bp, size_t asize){
     /* split */
     if((size - asize) >= MINIMUN_BLOCK){
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
         REMOVE(bp);
 #endif        
         /* current block */
@@ -233,17 +254,16 @@ static void place(void* bp, size_t asize){
         PUT(HDRP(bp), PACK((size-asize), 0));
         PUT(FTRP(bp), PACK((size-asize), 0));
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
         INSERT(bp);
 #endif
     }
     /* no need for spliting */
     else{
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
         REMOVE(bp);
 #endif        
-
         PUT(HDRP(bp), PACK(size, 1));
         PUT(FTRP(bp), PACK(size, 1));
     }
@@ -257,17 +277,21 @@ static void place(void* bp, size_t asize){
 static void* find_fit(size_t asize){
 
 #if (REPLACEMENT == FIRST_FIT)
-    char* bp = heap_listp;
-
 #if (STRUCTURE == IMPLICIT)
+    char* bp = heap_listp;
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 #elif (STRUCTURE == EXPLICIT)
+    char* bp = heap_listp;
     bp = explicit_free_list_head;
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+#elif (STRUCTURE == SEGREGATE)
+    /* 不只遍歷一個case，假如當前case無法滿足條件，則尋找更大的case */
+    unsigned int** bp = GET_CASE_HEAD(segregate_case_chooser(asize));
+    for(; *bp != NULL; *bp = GET_NEXT_FREE_BLKP(*bp)){
 #endif
-        if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
+        if(!GET_ALLOC(HDRP(*bp)) && GET_SIZE(HDRP(*bp)) >= asize){
 
-            return bp;
+            return *bp;
         }
     }
 
@@ -302,6 +326,9 @@ static void* find_fit(size_t asize){
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 #elif (STRUCTURE == EXPLICIT)
     bp = explicit_free_list_head;
+    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+#elif (STRUCTURE == SEGREGATE)
+    bp = GET_CASE_HEAD(segregate_case_chooser(asize));
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #endif
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
@@ -344,22 +371,10 @@ static void* coalesce(void* bp){
     if(prev_alloc && next_alloc){
 
     }
-    /* case 2: previous block is free */
-    else if(!prev_alloc && next_alloc){
-
-#if (STRUCTURE == EXPLICIT)
-        REMOVE(PREV_BLKP(bp));
-#endif         
-        size += GET_SIZE(PREV_FTRP(bp));
-
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);        
-    }
-    /* case 3: next block is free */
+    /* case 2: next block is free */
     else if(prev_alloc && !next_alloc){
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
         REMOVE(NEXT_BLKP(bp));
 #endif           
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -367,10 +382,22 @@ static void* coalesce(void* bp){
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         PUT(HDRP(bp), PACK(size, 0));       
     }
+    /* case 3: previous block is free */
+    else if(!prev_alloc && next_alloc){
+
+#if (STRUCTURE != IMPLICIT)
+        REMOVE(PREV_BLKP(bp));
+#endif         
+        size += GET_SIZE(PREV_FTRP(bp));
+
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);        
+    }    
     /* case 4: both previous and next block are free */
     else if(!prev_alloc && !next_alloc){
 
-#if (STRUCTURE == EXPLICIT)
+#if (STRUCTURE != IMPLICIT)
         REMOVE(PREV_BLKP(bp));
         REMOVE(NEXT_BLKP(bp));
 #endif
@@ -388,8 +415,8 @@ static void* coalesce(void* bp){
     }
 #endif
 
-#if (STRUCTURE == EXPLICIT)
-        INSERT(bp);
+#if (STRUCTURE != IMPLICIT)
+    INSERT(bp);
 #endif 
 
     return bp;
@@ -511,11 +538,11 @@ __inline static int checkheap_boundary(void* bp){
 
 #if (STRUCTURE == EXPLICIT)
 /**
- * @brief insert block at the top of the free list (LIFO)
+ * @brief insert block at the top of the explicit free list (LIFO)
  * 
  * @param bp data block address
  */
-static void LIFO_insert_free_blk(void* bp){
+static void explicit_insert_free_blk(void* bp){
 
     if(bp == NULL){
 
@@ -539,11 +566,11 @@ static void LIFO_insert_free_blk(void* bp){
 }
 
 /**
- * @brief remove block from the free list
+ * @brief remove block from the explicit free list
  * 
  * @param bp data block address
  */
-static void LIFO_remove_free_blk(void* bp){
+static void explicit_remove_free_blk(void* bp){
 
     if(bp == NULL){
 
@@ -577,7 +604,10 @@ static void LIFO_remove_free_blk(void* bp){
     }   
 }
 
-#if (STRUCTURE == EXPLICIT)
+/**
+ * @brief print and check all free blocks in explicit free list
+ * 
+ */
 static void freelist_checker(void){
 
     char* ptr = explicit_free_list_head;
@@ -611,8 +641,179 @@ static void freelist_checker(void){
     }
 
 }
-#endif
+#elif (STRUCTURE == SEGREGATE)
+/**
+ * @brief 
+ * 
+ * @param size 
+ * @return 
+ */
+ static int segregate_case_chooser(int size){
 
+    int ret = -1;
+
+    if(size >= 4096){
+
+        ret = 8;
+    }else if(size > 2048){
+
+        ret = 7;
+    }else if(size > 1024){
+
+        ret = 6;
+    }else if(size > 512){
+
+        ret = 5;
+    }else if(size > 256){
+
+        ret = 4;
+    }else if(size > 128){
+
+        ret = 3;
+    }else if(size > 64){
+
+        ret = 2;
+    }else if(size > 32){
+
+        ret = 1;
+    }else if(size >= MINIMUN_BLOCK){
+
+        ret = 0;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief insert block at the top of the segregated free list (LIFO)
+ * 
+ * @param bp data block address
+ */
+static void segregate_insert_free_blk(void* bp){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    int case_range = segregate_case_chooser(GET_SIZE(HDRP(bp)));
+
+    if(case_range == -1){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    unsigned int* list = GET_CASE_HEAD(case_range);
+
+    /* LIFO */
+    PUT_PREV_FREE_BLKP(bp, 0);
+
+    if(*list){
+
+        PUT_PREV_FREE_BLKP(*list, bp);
+        PUT_NEXT_FREE_BLKP(bp, *list);
+    }else{
+
+        PUT_NEXT_FREE_BLKP(bp, 0);
+    }
+
+    PUT(list, (unsigned int)bp);
+
+    // printf("[insert][%d]\n", GET_SIZE(HDRP(bp)));
+    // FREE_LIST_DETAIL();
+}
+
+/**
+ * @brief remove block from the segregated free list
+ * 
+ * @param bp data block address
+ */
+static void segregate_remove_free_blk(void* bp){
+
+    if(bp == NULL){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    int case_range = segregate_case_chooser(GET_SIZE(HDRP(bp)));
+
+    if(case_range == -1){
+
+        SHOW_WARNING();
+        return;
+    }
+
+    unsigned int* list = GET_CASE_HEAD(case_range);    
+
+    /* LIFO */
+    char* prev = GET_PREV_FREE_BLKP(bp);
+    char* next = GET_NEXT_FREE_BLKP(bp);
+
+    if(prev != NULL){
+
+        PUT_NEXT_FREE_BLKP(prev, next);
+    }
+
+    if(next != NULL){
+
+        PUT_PREV_FREE_BLKP(next, prev);
+    }
+
+    if(bp == (unsigned int*)(*list)){
+
+        PUT(list, 0);
+    }
+
+    // printf("[remove][%d]\n", GET_SIZE(HDRP(bp)));
+    // FREE_LIST_DETAIL();
+}
+
+/**
+ * @brief  print and check all free blocks in each segregated free list
+ * 
+ */
+static void caselist_checker(void){
+
+    size_t hsize, halloc, fsize, falloc;
+    char* nblk = NULL, *pblk = NULL;
+    
+    for(int i=0; i < SEGREGATE_CASE_NUM; i++){
+
+        unsigned int** list = GET_CASE_HEAD(i);
+        unsigned int* bp = *list;
+
+        printf("case %d\n", i);
+
+        for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+            
+            hsize = GET_SIZE(HDRP(bp));
+            halloc = GET_ALLOC(HDRP(bp));  
+            fsize = GET_SIZE(FTRP(bp));
+            falloc = GET_ALLOC(FTRP(bp));
+
+            nblk = GET_NEXT_FREE_BLKP(bp);  
+            pblk = GET_PREV_FREE_BLKP(bp);
+
+            printf("%p: header: [%d:%c] footer: [%d:%c] next_block: [%p] previous_block: [%p]\n", 
+                    bp, 
+                    hsize, (halloc ? 'a' : 'f'), 
+                    fsize, (falloc ? 'a' : 'f'),
+                    nblk, pblk); 
+
+            if(bp == (unsigned int*)nblk || bp == (unsigned int*)pblk){
+
+                SHOW_WARNING();
+                exit(-1);
+            }
+
+            checkblock(bp);
+        }
+        printf("\n");
+    }
+}
 #endif
 
 /*********************************************************
@@ -629,20 +830,27 @@ static void freelist_checker(void){
  */
 int mm_init(void){
 
-    if((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1){
+    if((heap_listp = mem_sbrk(4*WSIZE + SEGREGATE_LIST_PADDING)) == (void*)-1){
 
         SHOW_WARNING();
         return -1;
     }
 
-    /* initialize 4 blocks */
-    PUT(heap_listp, PACK(0, 0));                    /* Alignment padding */
-    PUT(heap_listp + WSIZE, PACK(DSIZE, 1));        /* Prologue header */
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));    /* Prologue footer */
-    PUT(heap_listp + (3*WSIZE), PACK(0, 1));        /* Epilogue header */
+#if (STRUCTURE == SEGREGATE)
+    for(int i=0; i < SEGREGATE_CASE_NUM; i++){
+
+        PUT(heap_listp + (i*WSIZE), 0);
+    }
+#else
+    PUT(heap_listp + SEGREGATE_LIST_PADDING, PACK(0, 0));                       /* Alignment padding */
+#endif
+
+    PUT(heap_listp + (1*WSIZE) + SEGREGATE_LIST_PADDING, PACK(DSIZE, 1));       /* Prologue header */
+    PUT(heap_listp + (2*WSIZE) + SEGREGATE_LIST_PADDING, PACK(DSIZE, 1));       /* Prologue footer */
+    PUT(heap_listp + (3*WSIZE) + SEGREGATE_LIST_PADDING, PACK(0, 1));           /* Epilogue header */
 
     /* move pointer heap_listp */
-    heap_listp += (2*WSIZE);
+    heap_listp += (2*WSIZE + SEGREGATE_LIST_PADDING);
 
 #if (STRUCTURE == EXPLICIT)
     explicit_free_list_head = NULL;

@@ -100,7 +100,9 @@ To get a list of the driver flags:
   
     - 不要更改`mm.h`中的結構，實驗建議在`mm.c`中編寫static functions
     - 不要調用libc中任何記憶體有關的函式或系統調用
-    - 不得在mm.c中使用任何數據結構(陣列、列表、樹、結構體等)，只能宣告全局的標量參數(int, float, char , pointer, etc)
+    - 不得在mm.c中使用全局數據結構(陣列、列表、樹、結構體等)，只能宣告全局的標量參數(int, float, char , pointer, etc)
+      - 因為`mdriver`無法判斷空間使用率
+    - 若有使用數據結構需求，可以分配在堆的起始位置
     - 除了參考書或K &R之外不能複製任何代碼，但是可以參考並修改
     - 編寫時推薦查看trace files
     - 動態記憶體分配器返回的地址必須要是8 bytes對齊
@@ -184,6 +186,8 @@ To get a list of the driver flags:
 
 ### 顯式空閒列表
 - LIFO + first fit
+- LIFO + best fit
 
 ### 分離式空閒列表
 - LIFO + first fit
+- LIFO + best fit
