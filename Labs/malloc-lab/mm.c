@@ -55,7 +55,7 @@ static char* exlicit_free_list_head = NULL;
 #define FIRST_FIT                                   0
 #define NEXT_FIT                                    1
 #define BEST_FIT                                    2
-#define REPLACEMENT                                 FIRST_FIT
+#define REPLACEMENT                                 BEST_FIT
 
 /*********************************************************
 * Macros for block operation
@@ -130,6 +130,11 @@ static char* exlicit_free_list_head = NULL;
 
 #define BLOCK_DETAIL(bp)                            // printblock((bp))
 
+#if (STRUCTURE == EXPLICIT)
+#define FREE_LIST_DETAIL()                          freelist_checker()
+#else
+#define FREE_LIST_DETAIL()                          
+#endif
 /*********************************************************
 * Global variables
  ********************************************************/
@@ -155,6 +160,7 @@ __inline static int checkheap_boundary(void* bp);
 #if (STRUCTURE == EXPLICIT)
 static void LIFO_insert_free_blk(void* bp);
 static void LIFO_remove_free_blk(void* bp);
+static void freelist_checker(void);
 #endif
 
 /**
@@ -211,13 +217,12 @@ static void place(void* bp, size_t asize){
     /* split */
     if((size - asize) >= MINIMUN_BLOCK){
 
+#if (STRUCTURE == EXPLICIT)
+        REMOVE(bp);
+#endif        
         /* current block */
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
-
-#if (STRUCTURE == EXPLICIT)
-        REMOVE(bp);
-#endif
 
         bp = NEXT_BLKP(bp);
 
@@ -232,12 +237,12 @@ static void place(void* bp, size_t asize){
     /* no need for spliting */
     else{
 
-        PUT(HDRP(bp), PACK(size, 1));
-        PUT(FTRP(bp), PACK(size, 1));
-
 #if (STRUCTURE == EXPLICIT)
         REMOVE(bp);
-#endif
+#endif        
+
+        PUT(HDRP(bp), PACK(size, 1));
+        PUT(FTRP(bp), PACK(size, 1));
     }
 }
 
@@ -340,44 +345,43 @@ static void* coalesce(void* bp){
 
     /* case 1: none of the previos and next blocks aren free */
     if(prev_alloc && next_alloc){
-        
-        // no need for coalescing
+
     }
     /* case 2: previous block is free */
     else if(!prev_alloc && next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
         REMOVE(PREV_BLKP(bp));
-#endif          
+#endif         
         size += GET_SIZE(PREV_FTRP(bp));
 
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
+        bp = PREV_BLKP(bp);        
     }
     /* case 3: next block is free */
     else if(prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
-        REMOVE(PREV_BLKP(NEXT_BLKP(bp)));
+        REMOVE(NEXT_BLKP(bp));
 #endif           
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        PUT(HDRP(bp), PACK(size, 0));        
+        PUT(HDRP(bp), PACK(size, 0));       
     }
     /* case 4: both previous and next block are free */
     else if(!prev_alloc && !next_alloc){
 
 #if (STRUCTURE == EXPLICIT)
         REMOVE(PREV_BLKP(bp));
-        REMOVE(PREV_BLKP(NEXT_BLKP(bp)));
+        REMOVE(NEXT_BLKP(bp));
 #endif
         size += GET_SIZE(PREV_FTRP(bp)) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
 
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
+        bp = PREV_BLKP(bp);   
     }
 
 #if (REPLACEMENT == NEXT_FIT)
@@ -391,8 +395,8 @@ static void* coalesce(void* bp){
 #endif
 
 #if (STRUCTURE == EXPLICIT)
-    INSERT(bp); // insert block to free list
-#endif  
+        INSERT(bp);
+#endif 
 
     return bp;
 }
@@ -471,6 +475,8 @@ static void checkheap(int verbose){
         SHOW_WARNING();
         printf("Bad epilouge header\n");
     }
+
+    FREE_LIST_DETAIL();
 }
 
 /**
@@ -528,13 +534,6 @@ static void LIFO_insert_free_blk(void* bp){
 
     if(exlicit_free_list_head != NULL){
 
-        if(bp == (char*)0xd0d0d0d0 || exlicit_free_list_head == (char*)0xd0d0d0d0){
-
-            printf("[illegal address] [line: %u]\n", __LINE__);
-            checkheap(1);
-            exit(-1);
-        }
-
         PUT_PREV_FREE_BLKP(exlicit_free_list_head, bp);
         PUT_NEXT_FREE_BLKP(bp, exlicit_free_list_head);
     }else{
@@ -562,18 +561,11 @@ static void LIFO_remove_free_blk(void* bp){
 
         SHOW_WARNING();
         return;
-    }
+    }   
 
     /* LIFO */
     char* prev = GET_PREV_FREE_BLKP(bp);
     char* next = GET_NEXT_FREE_BLKP(bp);
-
-    if(prev == (char*)0xd0d0d0d0 || next == (char*)0xd0d0d0d0){
-
-        printf("[illegal address] [line: %u]\n", __LINE__);
-        checkheap(1);
-        exit(-1);
-    }    
 
     if(prev != NULL){
 
@@ -588,8 +580,45 @@ static void LIFO_remove_free_blk(void* bp){
     if(bp == exlicit_free_list_head){
 
         exlicit_free_list_head = GET_NEXT_FREE_BLKP(bp);
-    }
+    }   
 }
+
+#if (STRUCTURE == EXPLICIT)
+static void freelist_checker(void){
+
+    char* ptr = exlicit_free_list_head;
+
+    size_t hsize, halloc, fsize, falloc;
+    char* nblk = NULL, *pblk = NULL;
+
+    for(; ptr != NULL; ptr = GET_NEXT_FREE_BLKP(ptr)){
+
+        hsize = GET_SIZE(HDRP(ptr));
+        halloc = GET_ALLOC(HDRP(ptr));  
+        fsize = GET_SIZE(FTRP(ptr));
+        falloc = GET_ALLOC(FTRP(ptr));
+
+        nblk = GET_NEXT_FREE_BLKP(ptr);  
+        pblk = GET_PREV_FREE_BLKP(ptr);
+
+        printf("%p: header: [%d:%c] footer: [%d:%c] next_block: [%p] previous_block: [%p]\n", 
+                ptr, 
+                hsize, (halloc ? 'a' : 'f'), 
+                fsize, (falloc ? 'a' : 'f'),
+                nblk, pblk); 
+
+        if(ptr == nblk || ptr == pblk){
+
+            SHOW_WARNING();
+            exit(-1);
+        }
+
+        checkblock(ptr);
+    }
+
+}
+#endif
+
 #endif
 
 /*********************************************************
@@ -620,6 +649,10 @@ int mm_init(void){
 
     /* move pointer heap_listp */
     heap_listp += (2*WSIZE);
+
+#if (STRUCTURE == EXPLICIT)
+    exlicit_free_list_head = NULL;
+#endif
 
     /* next fit pointer */
 #if (REPLACEMENT == NEXT_FIT)
@@ -729,7 +762,7 @@ void mm_free(void* bp){
     PUT(FTRP(bp), PACK(size, 0));
 
     /* coalescing blocks(if any) */
-    coalesce(bp);    
+    coalesce(bp);
 }
 
 /*
