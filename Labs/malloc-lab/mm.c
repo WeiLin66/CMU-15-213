@@ -51,9 +51,7 @@ team_t team = {
 
 #define FIRST_FIT                                   0
 #define BEST_FIT                                    1
-#if (STRUCTURE == IMPLICIT)
 #define NEXT_FIT                                    2
-#endif
 #define REPLACEMENT                                 FIRST_FIT
 
 /*********************************************************
@@ -71,7 +69,7 @@ team_t team = {
 
 /* read & write a word at address p */
 #define GET(p)                                      (*(unsigned int*)(p))
-#define PUT(p, val)                                 (*(unsigned int*)(p) = (val))
+#define PUT(p, val)                                 (*(unsigned int*)(p) = (unsigned int)(val))
 
 /* get size and allocated bit of a block */
 #define GET_SIZE(p)                                 (GET(p) & ~0x7)
@@ -240,12 +238,13 @@ static void place(void* bp, size_t asize){
 
     size_t size = GET_SIZE(HDRP(bp));
 
+#if (STRUCTURE != IMPLICIT)
+        REMOVE(bp);
+#endif     
+
     /* split */
     if((size - asize) >= MINIMUN_BLOCK){
 
-#if (STRUCTURE != IMPLICIT)
-        REMOVE(bp);
-#endif        
         /* current block */
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
@@ -263,9 +262,6 @@ static void place(void* bp, size_t asize){
     /* no need for spliting */
     else{
 
-#if (STRUCTURE != IMPLICIT)
-        REMOVE(bp);
-#endif        
         PUT(HDRP(bp), PACK(size, 1));
         PUT(FTRP(bp), PACK(size, 1));
     }
@@ -278,7 +274,7 @@ static void place(void* bp, size_t asize){
  */ 
 static void* find_fit(size_t asize){
 
-#if (REPLACEMENT == FIRST_FIT)
+#if (REPLACEMENT == FIRST_FIT) || (STRUCTURE == SEGREGATE)
 #if (STRUCTURE == IMPLICIT)
     char* bp = heap_listp;
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
@@ -304,7 +300,7 @@ static void* find_fit(size_t asize){
 #endif
 
     return NULL; /* No fit found */
-#elif defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
+#elif (STRUCTURE == IMPLICIT) && (REPLACEMENT == NEXT_FIT)
     char *oldrover = rover;
 
     /* Search from the rover to the end of list */
@@ -334,20 +330,6 @@ static void* find_fit(size_t asize){
     for(; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){
 #elif (STRUCTURE == EXPLICIT)
     bp = explicit_free_list_head;
-    for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
-#elif (STRUCTURE == SEGREGATE)
-    int case_range = segregate_case_chooser(asize);
-
-    for(; case_range<SEGREGATE_CASE_NUM; case_range++){
-        
-        bp = GET_CASE_HEAD_CONTENT(case_range);
-        
-        if(bp != NULL){
-
-            break;
-        }
-    }
-
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #endif
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
@@ -703,8 +685,8 @@ static void freelist_checker(void){
 }
 
 /**
- * @brief insert block at the top of the segregated free list (LIFO)
- * 
+ * @brief insert block to categorized list - block should be placed in ascending order
+ *  
  * @param bp data block address
  */
 static void segregate_insert_free_blk(void* bp){
@@ -723,21 +705,45 @@ static void segregate_insert_free_blk(void* bp){
         return;
     }
 
-    unsigned int* list = GET_CASE_HEAD(case_range);
+    unsigned int** head = GET_CASE_HEAD(case_range);
+    unsigned int* next = GET_CASE_HEAD_CONTENT(case_range);
+    unsigned int* prev = NULL;    
+    size_t size = GET_SIZE(HDRP(bp));
 
-    /* LIFO */
-    PUT_PREV_FREE_BLKP(bp, 0);
+    while(next){
 
-    if(*list){
+        if(size <= GET_SIZE(HDRP(next))){
 
-        PUT_PREV_FREE_BLKP(*list, bp);
-        PUT_NEXT_FREE_BLKP(bp, *list);
-    }else{
+            break;
+        }else{
 
-        PUT_NEXT_FREE_BLKP(bp, 0);
+            prev = next;
+            next = GET_NEXT_FREE_BLKP(next);
+        }
     }
 
-    PUT(list, (unsigned int)bp);
+    if(next == *head){
+
+        PUT_PREV_FREE_BLKP(bp, 0);
+        PUT_NEXT_FREE_BLKP(bp, next);
+
+        if(next != NULL){
+
+            PUT_PREV_FREE_BLKP(next, bp);
+        }
+
+        PUT(head, bp);
+    }else{
+
+        PUT_PREV_FREE_BLKP(bp, prev);
+        PUT_NEXT_FREE_BLKP(bp, next);
+        PUT_NEXT_FREE_BLKP(prev, bp);
+
+        if(next != NULL){
+
+            PUT_PREV_FREE_BLKP(next, bp);
+        }
+    }
 
     CHECK_INSERT_LIST();
 }
@@ -765,7 +771,6 @@ static void segregate_remove_free_blk(void* bp){
 
     unsigned int* list = GET_CASE_HEAD(case_range);    
 
-    /* LIFO */
     char* prev = GET_PREV_FREE_BLKP(bp);
     char* next = GET_NEXT_FREE_BLKP(bp);
 
@@ -774,7 +779,7 @@ static void segregate_remove_free_blk(void* bp){
         PUT_NEXT_FREE_BLKP(prev, next);
     }else{
 
-        PUT(list, (unsigned int)next);
+        PUT(list, next);
     }
 
     if(next != NULL){

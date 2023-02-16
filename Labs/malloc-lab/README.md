@@ -189,5 +189,5 @@ To get a list of the driver flags:
 - LIFO + best fit
 
 ### 分離式空閒列表
-- LIFO + first fit
-- LIFO + best fit
+- 按塊大小順序排列 + first fit
+- 按塊大小順序排列 + best fit
