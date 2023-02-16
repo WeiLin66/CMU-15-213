@@ -156,7 +156,7 @@ team_t team = {
 
 static char* heap_listp = NULL;
 
-#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
+#if (STRUCTURE == IMPLICIT) && (REPLACEMENT == NEXT_FIT)
 static char* rover = NULL;
 #endif
 
@@ -408,7 +408,7 @@ static void* coalesce(void* bp){
         bp = PREV_BLKP(bp);   
     }
 
-#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
+#if (STRUCTURE == IMPLICIT) && (REPLACEMENT == NEXT_FIT)
     if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp))){
 
         rover = bp;
@@ -877,7 +877,7 @@ int mm_init(void){
 #endif
 
     /* next fit pointer */
-#if defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
+#if (STRUCTURE == IMPLICIT) && (REPLACEMENT == NEXT_FIT)
     rover = heap_listp;
 #endif
 
