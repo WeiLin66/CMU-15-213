@@ -132,6 +132,7 @@ team_t team = {
 #define SEGREGATE_CASE_NUM                          9
 #define SEGREGATE_LIST_PADDING                      WSIZE * (SEGREGATE_CASE_NUM - 1)
 #define GET_CASE_HEAD(case)                         ((void *)((char *)heap_listp - (SEGREGATE_CASE_NUM + 1)*WSIZE + (case)*WSIZE))
+#define GET_CASE_HEAD_CONTENT(case)                 ((void *)(*((unsigned int *)GET_CASE_HEAD(case))))
 #else
 #define SEGREGATE_LIST_PADDING                      0
 #endif
@@ -142,13 +143,15 @@ team_t team = {
 
 #define SHOW_WARNING()                              printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
 
-#define BLOCK_DETAIL(bp)                            printblock((bp))
-
 #if (STRUCTURE == EXPLICIT)
 #define FREE_LIST_DETAIL()                          freelist_checker()
 #elif (STRUCTURE == SEGREGATE)
-#define FREE_LIST_DETAIL()                          caselist_checker()                      
+#define FREE_LIST_DETAIL()                          caselist_checker()
+#define CHECK_INSERT_LIST()                         //printf("[%s][%d]\n", __FUNCTION__, GET_SIZE(HDRP(bp))); FREE_LIST_DETAIL();
+#else
+#define FREE_LIST_DETAIL()
 #endif
+
 /*********************************************************
 * Global variables
  ********************************************************/
@@ -212,13 +215,12 @@ static void* extend_heap(size_t words){
     PUT(HDRP(bp), PACK(size, 0));           // Header
     PUT(FTRP(bp), PACK(size, 0));           // Footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   // Epilogue block
-
 #if (STRUCTURE != IMPLICIT)
-    PUT_NEXT_FREE_BLKP(bp, 0);  // next pointer
-    PUT_PREV_FREE_BLKP(bp, 0);  // previous pointer
+    PUT_NEXT_FREE_BLKP(bp, 0);              // next pointer
+    PUT_PREV_FREE_BLKP(bp, 0);              // previous pointer
 #endif
 
-    return coalesce(bp);    // the end of the previous block could be free
+    return coalesce(bp);    // the end of the previous block might be free
 }
 
 /** 
@@ -285,15 +287,21 @@ static void* find_fit(size_t asize){
     bp = explicit_free_list_head;
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #elif (STRUCTURE == SEGREGATE)
-    /* 不只遍歷一個case，假如當前case無法滿足條件，則尋找更大的case */
-    unsigned int** bp = GET_CASE_HEAD(segregate_case_chooser(asize));
-    for(; *bp != NULL; *bp = GET_NEXT_FREE_BLKP(*bp)){
-#endif
-        if(!GET_ALLOC(HDRP(*bp)) && GET_SIZE(HDRP(*bp)) >= asize){
+    int case_range = segregate_case_chooser(asize);
+    char* bp = NULL;
 
-            return *bp;
+    for(; case_range<SEGREGATE_CASE_NUM; case_range++){
+        bp = GET_CASE_HEAD_CONTENT(case_range);
+        for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
+#endif
+            if(!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize){
+
+                return bp;
+            }
         }
+#if (STRUCTURE == SEGREGATE)
     }
+#endif
 
     return NULL; /* No fit found */
 #elif defined(NEXT_FIT) && (REPLACEMENT == NEXT_FIT)
@@ -309,7 +317,7 @@ static void* find_fit(size_t asize){
     }
 
     /* search from start of list to old rover */
-    for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover)){
+    for (rover = heap_listp; rover<oldrover; rover = NEXT_BLKP(rover)){
 
         if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover)))){
         
@@ -328,7 +336,18 @@ static void* find_fit(size_t asize){
     bp = explicit_free_list_head;
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #elif (STRUCTURE == SEGREGATE)
-    bp = GET_CASE_HEAD(segregate_case_chooser(asize));
+    int case_range = segregate_case_chooser(asize);
+
+    for(; case_range<SEGREGATE_CASE_NUM; case_range++){
+        
+        bp = GET_CASE_HEAD_CONTENT(case_range);
+        
+        if(bp != NULL){
+
+            break;
+        }
+    }
+
     for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
 #endif
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){
@@ -342,7 +361,6 @@ static void* find_fit(size_t asize){
             }
         }
     }
-
     return minibp;
 #endif
 
@@ -655,25 +673,25 @@ static void freelist_checker(void){
     if(size >= 4096){
 
         ret = 8;
-    }else if(size > 2048){
+    }else if(size >= 2048){
 
         ret = 7;
-    }else if(size > 1024){
+    }else if(size >= 1024){
 
         ret = 6;
-    }else if(size > 512){
+    }else if(size >= 512){
 
         ret = 5;
-    }else if(size > 256){
+    }else if(size >= 256){
 
         ret = 4;
-    }else if(size > 128){
+    }else if(size >= 128){
 
         ret = 3;
-    }else if(size > 64){
+    }else if(size >= 64){
 
         ret = 2;
-    }else if(size > 32){
+    }else if(size >= 32){
 
         ret = 1;
     }else if(size >= MINIMUN_BLOCK){
@@ -721,8 +739,7 @@ static void segregate_insert_free_blk(void* bp){
 
     PUT(list, (unsigned int)bp);
 
-    // printf("[insert][%d]\n", GET_SIZE(HDRP(bp)));
-    // FREE_LIST_DETAIL();
+    CHECK_INSERT_LIST();
 }
 
 /**
@@ -755,6 +772,9 @@ static void segregate_remove_free_blk(void* bp){
     if(prev != NULL){
 
         PUT_NEXT_FREE_BLKP(prev, next);
+    }else{
+
+        PUT(list, (unsigned int)next);
     }
 
     if(next != NULL){
@@ -762,13 +782,7 @@ static void segregate_remove_free_blk(void* bp){
         PUT_PREV_FREE_BLKP(next, prev);
     }
 
-    if(bp == (unsigned int*)(*list)){
-
-        PUT(list, 0);
-    }
-
-    // printf("[remove][%d]\n", GET_SIZE(HDRP(bp)));
-    // FREE_LIST_DETAIL();
+    CHECK_INSERT_LIST();
 }
 
 /**
@@ -780,12 +794,12 @@ static void caselist_checker(void){
     size_t hsize, halloc, fsize, falloc;
     char* nblk = NULL, *pblk = NULL;
     
-    for(int i=0; i < SEGREGATE_CASE_NUM; i++){
+    for(int i=0; i<SEGREGATE_CASE_NUM; i++){
 
         unsigned int** list = GET_CASE_HEAD(i);
         unsigned int* bp = *list;
 
-        printf("case %d\n", i);
+        printf("[case %d]:\n", i);
 
         for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
             
@@ -813,6 +827,7 @@ static void caselist_checker(void){
         }
         printf("\n");
     }
+    printf("\n----------------------end of segregated list check----------------------\n\n");
 }
 #endif
 
@@ -837,7 +852,7 @@ int mm_init(void){
     }
 
 #if (STRUCTURE == SEGREGATE)
-    for(int i=0; i < SEGREGATE_CASE_NUM; i++){
+    for(int i=0; i<SEGREGATE_CASE_NUM; i++){
 
         PUT(heap_listp + (i*WSIZE), 0);
     }
