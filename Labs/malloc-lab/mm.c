@@ -643,9 +643,9 @@ static void freelist_checker(void){
 }
 #elif (STRUCTURE == SEGREGATE)
 /**
- * @brief 
+ * @brief choose list category base on size
  * 
- * @param size 
+ * @param size required block size
  * @return 
  */
  static int segregate_case_chooser(int size){
@@ -769,7 +769,7 @@ static void segregate_remove_free_blk(void* bp){
         return;
     }
 
-    unsigned int* list = GET_CASE_HEAD(case_range);    
+    unsigned int** list = GET_CASE_HEAD(case_range);    
 
     char* prev = GET_PREV_FREE_BLKP(bp);
     char* next = GET_NEXT_FREE_BLKP(bp);
