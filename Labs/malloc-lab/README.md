@@ -163,6 +163,10 @@ To get a list of the driver flags:
     - 使用性能工具優化性能
       - valgrind
         - valgrind ./mdriver -a -v -g -t traces/
+      - gprof
+        - 在Makefile中增加參數-pg，編譯後生成gmon.out
+        - gprof ./mdriver | cat
+        - 查看每個調用函式的性能分析
     - 版本控管
       - 每當對已成功運行的分配器進行修改時，記得將原先的程式備份起來，以免發生不預期的問題導致程式碼無法復原(好習慣)
       - 管理使用不同版本的空閒列表機制

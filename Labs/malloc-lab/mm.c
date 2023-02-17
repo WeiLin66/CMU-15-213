@@ -60,7 +60,7 @@ team_t team = {
 
 #define WSIZE                                       4
 #define DSIZE                                       8
-#define CHUNKSIZE                                   (1 << 12)
+#define CHUNKSIZE                                   (1 << 6)
 
 #define MAX(x, y)                                   ((x) > (y) ? (x) : (y))
 
