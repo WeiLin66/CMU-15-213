@@ -200,6 +200,9 @@ static void segregate_remove_free_blk(void* bp);
 static void caselist_checker(void);
 #endif
 #endif
+#if (STRUCTURE != IMPLICIT) && defined(DEBUG_LIST_CHECKER)
+void cyclic_checker(void* bp);
+#endif
 
 /**
  * @brief extend heap with free block and return its block pointer 
@@ -445,7 +448,6 @@ static void printblock(void* bp){
 
     if(bp == NULL){
 
-        SHOW_WARNING();
         return;
     }
 
@@ -629,6 +631,8 @@ static void explicit_remove_free_blk(void* bp){
  * 
  */
 static void freelist_checker(void){
+
+    cyclic_checker(explicit_free_list_head);
 
     char* ptr = explicit_free_list_head;
 
@@ -844,6 +848,8 @@ static void caselist_checker(void){
 #ifdef DEBUG_MSG
         printf("[case %d]:\n", i);
 #endif
+        cyclic_checker(bp);
+
         for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
             
             hsize = GET_SIZE(HDRP(bp));
@@ -884,6 +890,35 @@ static void caselist_checker(void){
 #endif
 }
 #endif
+#endif
+
+#if (STRUCTURE != IMPLICIT) && defined(DEBUG_LIST_CHECKER)
+/**
+ * @brief check if the list contain cyclic nodes
+ * 
+ */ 
+void cyclic_checker(void* bp){
+
+    char* hare = bp;
+    char* tortoise = bp;
+
+    while(hare){
+
+        if(GET_NEXT_FREE_BLKP(hare) == NULL){
+
+            break;
+        }
+
+        hare = GET_NEXT_FREE_BLKP(GET_NEXT_FREE_BLKP(hare));
+        tortoise = GET_NEXT_FREE_BLKP(tortoise);
+
+        if(hare == tortoise){
+
+            SHOW_WARNING();
+            exit(-1);
+        }
+    }
+}
 #endif
 
 /*********************************************************
