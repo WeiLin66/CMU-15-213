@@ -162,7 +162,7 @@ To get a list of the driver flags:
     - 任何時刻修正完代碼後，記得調用`mm_checkheap`來檢測堆消息，這對debug、追蹤問題特別有效。實驗為其配分其中很大的原因就是希望學生養成撰寫這類函式的習慣
     - 使用性能工具優化性能
       - valgrind
-      - gprof
+        - valgrind ./mdriver -a -v -g -t traces/
     - 版本控管
       - 每當對已成功運行的分配器進行修改時，記得將原先的程式備份起來，以免發生不預期的問題導致程式碼無法復原(好習慣)
       - 管理使用不同版本的空閒列表機制
