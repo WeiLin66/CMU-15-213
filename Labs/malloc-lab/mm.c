@@ -139,13 +139,21 @@ team_t team = {
 * Macros for debugging message
  ********************************************************/
 
-#define SHOW_WARNING()                              printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
+// #define DEBUG_LIST_CHECKER
+// #define DEBUG_MSG
 
-#if (STRUCTURE == EXPLICIT)
+#ifdef DEBUG_MSG
+#define SHOW_WARNING()                              printf("[Warning] [File: %s] [Func: %s] [Line: %u]\n", __FILE__, __FUNCTION__, __LINE__)
+#define PRINT_BLOCK(bp)                             printblock((bp))
+#else
+#define SHOW_WARNING()
+#define PRINT_BLOCK(bp)
+#endif
+
+#if defined(DEBUG_LIST_CHECKER) && (STRUCTURE == EXPLICIT)
 #define FREE_LIST_DETAIL()                          freelist_checker()
-#elif (STRUCTURE == SEGREGATE)
+#elif defined(DEBUG_LIST_CHECKER) && (STRUCTURE == SEGREGATE)
 #define FREE_LIST_DETAIL()                          caselist_checker()
-#define CHECK_INSERT_LIST()                         //printf("[%s][%d]\n", __FUNCTION__, GET_SIZE(HDRP(bp))); FREE_LIST_DETAIL();
 #else
 #define FREE_LIST_DETAIL()
 #endif
@@ -172,20 +180,25 @@ static void* extend_heap(size_t words);
 static void place(void* bp, size_t asize);
 static void* find_fit(size_t asize);
 static void* coalesce(void* bp);
-static void printblock(void* bp);
 static void checkheap(int verbose);
 static void checkblock(void* bp);
 __inline static int checkheap_boundary(void* bp);
-
+#ifdef DEBUG_MSG
+static void printblock(void* bp);
+#endif
 #if (STRUCTURE == EXPLICIT)
 static void explicit_insert_free_blk(void* bp);
 static void explicit_remove_free_blk(void* bp);
+#ifdef DEBUG_LIST_CHECKER
 static void freelist_checker(void);
+#endif
 #elif (STRUCTURE == SEGREGATE)
 static int segregate_case_chooser(int size);
 static void segregate_insert_free_blk(void* bp);
 static void segregate_remove_free_blk(void* bp);
+#ifdef DEBUG_LIST_CHECKER
 static void caselist_checker(void);
+#endif
 #endif
 
 /**
@@ -422,6 +435,7 @@ static void* coalesce(void* bp){
     return bp;
 }
 
+#ifdef DEBUG_MSG
 /**
  * @brief print specific block's header and footer info
  * 
@@ -455,6 +469,7 @@ static void printblock(void* bp){
            hsize, (halloc ? 'a' : 'f'), 
            fsize, (falloc ? 'a' : 'f')); 
 }
+#endif
 
 /**
  * @brief checks each block's correctness on the heap
@@ -480,7 +495,7 @@ static void checkheap(int verbose){
 
         if(verbose){
 
-            printblock(bp);
+            PRINT_BLOCK(bp);
         }
 
         checkblock(bp);
@@ -488,7 +503,7 @@ static void checkheap(int verbose){
 
     if(verbose){
 
-        printblock(bp);
+        PRINT_BLOCK(bp);
     }
 
     if(GET_SIZE(HDRP(bp)) || !GET_ALLOC(HDRP(bp))){
@@ -496,8 +511,6 @@ static void checkheap(int verbose){
         SHOW_WARNING();
         printf("Bad epilouge header\n");
     }
-
-    FREE_LIST_DETAIL();
 }
 
 /**
@@ -508,19 +521,21 @@ static void checkblock(void* bp){
     if(bp == NULL){
 
         SHOW_WARNING();
-        return;
+        exit(-1);
     }
     
     if((size_t)bp % 8){
 
         SHOW_WARNING();
         printf("Error: %p is not doubleword aligned\n", bp);
+        exit(-1);
     }
 
     if(GET(HDRP(bp)) != GET(FTRP(bp))){
 
         SHOW_WARNING();
         printf("Error: header does not match footer\n");
+        exit(-1);
     }    
 }
 
@@ -563,6 +578,8 @@ static void explicit_insert_free_blk(void* bp){
     }
 
     explicit_free_list_head = bp;
+
+    FREE_LIST_DETAIL();
 }
 
 /**
@@ -601,9 +618,12 @@ static void explicit_remove_free_blk(void* bp){
     if(bp == explicit_free_list_head){
 
         explicit_free_list_head = GET_NEXT_FREE_BLKP(bp);
-    }   
+    }
+
+    FREE_LIST_DETAIL();
 }
 
+#ifdef DEBUG_LIST_CHECKER
 /**
  * @brief print and check all free blocks in explicit free list
  * 
@@ -612,26 +632,38 @@ static void freelist_checker(void){
 
     char* ptr = explicit_free_list_head;
 
+#ifdef DEBUG_MSG
     size_t hsize, halloc, fsize, falloc;
+#endif
     char* nblk = NULL, *pblk = NULL;
 
     for(; ptr != NULL; ptr = GET_NEXT_FREE_BLKP(ptr)){
 
+#ifdef DEBUG_MSG
         hsize = GET_SIZE(HDRP(ptr));
         halloc = GET_ALLOC(HDRP(ptr));  
         fsize = GET_SIZE(FTRP(ptr));
         falloc = GET_ALLOC(FTRP(ptr));
+#endif
 
         nblk = GET_NEXT_FREE_BLKP(ptr);  
         pblk = GET_PREV_FREE_BLKP(ptr);
 
+#ifdef DEBUG_MSG
         printf("%p: header: [%d:%c] footer: [%d:%c] next_block: [%p] previous_block: [%p]\n", 
                 ptr, 
                 hsize, (halloc ? 'a' : 'f'), 
                 fsize, (falloc ? 'a' : 'f'),
-                nblk, pblk); 
+                nblk, pblk);
+#endif
 
-        if(ptr == nblk || ptr == pblk){
+        if(pblk != NULL && GET_NEXT_FREE_BLKP(pblk) != ptr){
+
+            SHOW_WARNING();
+            exit(-1);
+        }
+
+        if(nblk != NULL && GET_PREV_FREE_BLKP(nblk) != ptr){
 
             SHOW_WARNING();
             exit(-1);
@@ -641,6 +673,7 @@ static void freelist_checker(void){
     }
 
 }
+#endif
 #elif (STRUCTURE == SEGREGATE)
 /**
  * @brief choose list category base on size
@@ -745,7 +778,7 @@ static void segregate_insert_free_blk(void* bp){
         }
     }
 
-    CHECK_INSERT_LIST();
+    FREE_LIST_DETAIL();
 }
 
 /**
@@ -787,16 +820,20 @@ static void segregate_remove_free_blk(void* bp){
         PUT_PREV_FREE_BLKP(next, prev);
     }
 
-    CHECK_INSERT_LIST();
+    FREE_LIST_DETAIL();
 }
 
+#ifdef DEBUG_LIST_CHECKER
 /**
  * @brief  print and check all free blocks in each segregated free list
  * 
  */
 static void caselist_checker(void){
 
-    size_t hsize, halloc, fsize, falloc;
+#ifdef DEBUG_MSG
+    size_t halloc, fsize, falloc;
+#endif
+    size_t hsize;
     char* nblk = NULL, *pblk = NULL;
     
     for(int i=0; i<SEGREGATE_CASE_NUM; i++){
@@ -804,36 +841,49 @@ static void caselist_checker(void){
         unsigned int** list = GET_CASE_HEAD(i);
         unsigned int* bp = *list;
 
+#ifdef DEBUG_MSG
         printf("[case %d]:\n", i);
-
+#endif
         for(; bp != NULL; bp = GET_NEXT_FREE_BLKP(bp)){
             
             hsize = GET_SIZE(HDRP(bp));
+#ifdef DEBUG_MSG
             halloc = GET_ALLOC(HDRP(bp));  
             fsize = GET_SIZE(FTRP(bp));
             falloc = GET_ALLOC(FTRP(bp));
-
+#endif
             nblk = GET_NEXT_FREE_BLKP(bp);  
             pblk = GET_PREV_FREE_BLKP(bp);
 
+#ifdef DEBUG_MSG
             printf("%p: header: [%d:%c] footer: [%d:%c] next_block: [%p] previous_block: [%p]\n", 
                     bp, 
                     hsize, (halloc ? 'a' : 'f'), 
                     fsize, (falloc ? 'a' : 'f'),
                     nblk, pblk); 
-
-            if(bp == (unsigned int*)nblk || bp == (unsigned int*)pblk){
+#endif
+            if((nblk != NULL) && (GET_PREV_FREE_BLKP(nblk) != bp || hsize > GET_SIZE(HDRP(nblk)))){
 
                 SHOW_WARNING();
                 exit(-1);
             }
 
+            if((pblk != NULL) && (GET_NEXT_FREE_BLKP(pblk) != bp || hsize < GET_SIZE(HDRP(pblk)))){
+
+                SHOW_WARNING();
+                exit(-1);
+            }                     
             checkblock(bp);
         }
+#ifdef DEBUG_MSG
         printf("\n");
+#endif
     }
+#ifdef DEBUG_MSG
     printf("\n----------------------end of segregated list check----------------------\n\n");
+#endif
 }
+#endif
 #endif
 
 /*********************************************************
