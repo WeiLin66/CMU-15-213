@@ -60,7 +60,7 @@ team_t team = {
 
 #define WSIZE                                       4
 #define DSIZE                                       8
-#define CHUNKSIZE                                   (1 << 6)
+#define CHUNKSIZE                                   (1 << 10)
 
 #define MAX(x, y)                                   ((x) > (y) ? (x) : (y))
 
@@ -127,7 +127,7 @@ team_t team = {
  ********************************************************/
 
 #if (STRUCTURE == SEGREGATE)
-#define SEGREGATE_CASE_NUM                          9
+#define SEGREGATE_CASE_NUM                          7   /* 1, 3, 5, 7, 9, 11, 13 */
 #define SEGREGATE_LIST_PADDING                      WSIZE * (SEGREGATE_CASE_NUM - 1)
 #define GET_CASE_HEAD(case)                         ((void *)((char *)heap_listp - (SEGREGATE_CASE_NUM + 1)*WSIZE + (case)*WSIZE))
 #define GET_CASE_HEAD_CONTENT(case)                 ((void *)(*((unsigned int *)GET_CASE_HEAD(case))))
@@ -687,38 +687,28 @@ static void freelist_checker(void){
  */
  static int segregate_case_chooser(int size){
 
-    int ret = -1;
+    if(size < MINIMUN_BLOCK){
 
-    if(size >= 4096){
-
-        ret = 8;
-    }else if(size >= 2048){
-
-        ret = 7;
-    }else if(size >= 1024){
-
-        ret = 6;
-    }else if(size >= 512){
-
-        ret = 5;
-    }else if(size >= 256){
-
-        ret = 4;
-    }else if(size >= 128){
-
-        ret = 3;
-    }else if(size >= 64){
-
-        ret = 2;
-    }else if(size >= 32){
-
-        ret = 1;
-    }else if(size >= MINIMUN_BLOCK){
-
-        ret = 0;
+        return -1;
     }
 
-    return ret;
+    int count = 0;
+    
+    size >>= (12 - SEGREGATE_CASE_NUM + 2);
+
+    for(int i=1; i<SEGREGATE_CASE_NUM; i++){
+           
+        if(size > 0){
+            
+            count++;
+            size >>= 1;  
+        }else{
+
+            break;
+        }      
+    }
+
+    return count;
 }
 
 /**
@@ -1086,6 +1076,32 @@ void *mm_realloc(void *ptr, size_t size){
     if(ptr == NULL){
 
         return mm_malloc(size);
+    }
+
+    size_t oldsize = GET_SIZE(HDRP(ptr));
+
+    /* same size, doesn't have to do anything */
+    if(oldsize - DSIZE >= size){
+
+        return ptr;
+    }
+
+    char* next = NEXT_BLKP(ptr);
+
+    if(next && GET_ALLOC(HDRP(next)) == 0){
+
+        size_t nextsize = GET_SIZE(HDRP(next));
+        char* next_footer = FTRP(next);
+
+        if(oldsize + nextsize - DSIZE >= size){
+#if (STRUCTURE != IMPLICIT)
+            REMOVE(next);
+#endif               
+            PUT(HDRP(oldptr), PACK(oldsize+nextsize, 1));
+            PUT(next_footer, PACK(oldsize+nextsize, 1));
+              
+            return oldptr;
+        }
     }
 
     /* allocate a new block */
