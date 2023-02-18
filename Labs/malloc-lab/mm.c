@@ -1091,14 +1091,13 @@ void *mm_realloc(void *ptr, size_t size){
     if(next && GET_ALLOC(HDRP(next)) == 0){
 
         size_t nextsize = GET_SIZE(HDRP(next));
-        char* next_footer = FTRP(next);
 
         if(oldsize + nextsize - DSIZE >= size){
 #if (STRUCTURE != IMPLICIT)
             REMOVE(next);
 #endif               
             PUT(HDRP(oldptr), PACK(oldsize+nextsize, 1));
-            PUT(next_footer, PACK(oldsize+nextsize, 1));
+            PUT(FTRP(next), PACK(oldsize+nextsize, 1));
               
             return oldptr;
         }
