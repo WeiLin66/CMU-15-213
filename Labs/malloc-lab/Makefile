@@ -5,10 +5,16 @@ TEAM = bovik
 VERSION = 1
 HANDINDIR = /afs/cs.cmu.edu/academic/class/15213-f01/malloclab/handin
 
+DEBUG = 0
 CC = gcc
+
+ifeq ($(DEBUG), 0)
 CFLAGS = -Wall -O2 -m32
-# CFLAGS = -Wall -pg -m32 # generating profiling information
-# CFLAGS = -Wall -g -m32 # for debugging
+else ifeq ($(DEBUG), 1)
+CFLAGS = -Wall -pg -m32 # generating profiling information
+else
+CFLAGS = -Wall -g -m32 # for debugging
+endif
 
 OBJS = mdriver.o mm.o memlib.o fsecs.o fcyc.o clock.o ftimer.o
 
