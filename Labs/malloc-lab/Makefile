@@ -33,6 +33,6 @@ handin:
 	cp mm.c $(HANDINDIR)/$(TEAM)-$(VERSION)-mm.c
 
 clean:
-	rm -f *~ *.o mdriver
+	rm -f *~ *.o *.out mdriver
 
 
