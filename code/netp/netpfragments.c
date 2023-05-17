@@ -44,7 +44,7 @@ void fragments()
     struct sockaddr {
         uint16_t  sa_family;    /* Protocol family */
         char      sa_data[14];  /* Address data  */
-    };	
+    };    
     /* $end sockaddr */
 
 }

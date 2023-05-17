@@ -9,9 +9,9 @@ void end(void)
 int main() 
 {
     if (Fork() == 0) 
-	atexit(end);
+    atexit(end);
     if (Fork() == 0) {
-	printf("0"); fflush(stdout); 
+    printf("0"); fflush(stdout); 
     }
     else {
         printf("1"); fflush(stdout); 

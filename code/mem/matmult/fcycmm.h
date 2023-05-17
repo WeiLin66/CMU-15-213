@@ -18,7 +18,7 @@ Parameters:
 
 /* Full version of fcyc with control over parameters */
 double fcyc_full(test_funct f, int param, int clear_cache,
-		 int k, double epsilon, int maxsamples, int compensate);
+         int k, double epsilon, int maxsamples, int compensate);
 
 /* Get current minimum */
 double get_min();
@@ -37,6 +37,6 @@ double err(int k);
 
 /* Full version that uses the time of day clock */
 double fcyc_full_tod(test_funct f, int param, int clear_cache,
-		     int k, double epsilon, int maxsamples, int compensate);
+             int k, double epsilon, int maxsamples, int compensate);
 
 double fcyc_tod(test_funct f, int param, int clear_cache);

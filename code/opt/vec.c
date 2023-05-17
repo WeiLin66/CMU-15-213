@@ -18,10 +18,10 @@ vec_ptr new_vec(long len)
     /* Allocate array */
     if (len > 0) {
         data = (data_t *)calloc(len, sizeof(data_t));
-	if (!data) {
-	    free((void *) result);
- 	    return NULL; /* Couldn't allocate storage */
-	}
+    if (!data) {
+        free((void *) result);
+         return NULL; /* Couldn't allocate storage */
+    }
     }
     /* data will either be NULL or allocated array */
     result->data = data;
@@ -31,7 +31,7 @@ vec_ptr new_vec(long len)
 /* Free storage used by vector */
 void free_vec(vec_ptr v) {
     if (v->data)
-	free(v->data);
+    free(v->data);
     free(v);
 }
 
@@ -42,7 +42,7 @@ void free_vec(vec_ptr v) {
 int get_vec_element(vec_ptr v, long index, data_t *dest)
 {
     if (index < 0 || index >= v->len)
-	return 0;
+    return 0;
     *dest = v->data[index];
     return 1;
 }
@@ -70,7 +70,7 @@ data_t *get_vec_start(vec_ptr v)
 int set_vec_element(vec_ptr v, long index, data_t val)
 {
     if (index < 0 || index >= v->len)
-	return 0;
+    return 0;
     v->data[index] = val;
     return 1;
 }
@@ -80,9 +80,9 @@ int set_vec_element(vec_ptr v, long index, data_t val)
 void set_vec_length(vec_ptr v, long newlen)
 {
     if (newlen > v->allocated_len) {
-	free(v->data);
-	v->data = calloc(newlen, sizeof(data_t));
-	v->allocated_len = newlen;
+    free(v->data);
+    v->data = calloc(newlen, sizeof(data_t));
+    v->allocated_len = newlen;
     }
     v->len = newlen;
 }

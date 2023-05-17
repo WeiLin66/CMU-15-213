@@ -19,8 +19,8 @@ int main(int argc, char **argv)
 
     /* Get input arguments */
     if (argc != 3) { 
-	printf("Usage: %s <nthreads> <log_nelems>\n", argv[0]);
-	exit(0);
+    printf("Usage: %s <nthreads> <log_nelems>\n", argv[0]);
+    exit(0);
     }
     nthreads = atoi(argv[1]);
     log_nelems = atoi(argv[2]);
@@ -28,26 +28,26 @@ int main(int argc, char **argv)
 
     /* Check input arguments */
     if  ((nelems % nthreads) != 0 || (log_nelems > 31)) {
-	printf("Error: invalid nelems\n");
-	exit(0);
+    printf("Error: invalid nelems\n");
+    exit(0);
     }
     nelems_per_thread = nelems / nthreads;
 
     /* Create peer threads and wait for them to finish */
     for (i = 0; i < nthreads; i++) {                  //line:conc:psumlocal:createloop1
-	myid[i] = i;                                  //line:conc:psumlocal:createloop2
-	Pthread_create(&tid[i], NULL, sum_local, &myid[i]); //line:conc:psumlocal:createloop3
+    myid[i] = i;                                  //line:conc:psumlocal:createloop2
+    Pthread_create(&tid[i], NULL, sum_local, &myid[i]); //line:conc:psumlocal:createloop3
     }                                                 //line:conc:psumlocal:createloop4
     for (i = 0; i < nthreads; i++)                    //line:conc:psumlocal:waitloop1
-	Pthread_join(tid[i], NULL);                   //line:conc:psumlocal:waitloop2
+    Pthread_join(tid[i], NULL);                   //line:conc:psumlocal:waitloop2
     
     /* Add up the partial sums computed by each thread */
     for (i = 0; i < nthreads; i++)                    //line:conc:psumlocal:sumloop1
-	result += psum[i];                            //line:conc:psumlocal:sumloop2
+    result += psum[i];                            //line:conc:psumlocal:sumloop2
 
     /* Check final answer */
     if (result != (nelems * (nelems-1))/2)     //line:conc:psumlocal:check1
-	printf("Error: result=%ld\n", result); //line:conc:psumlocal:check2
+    printf("Error: result=%ld\n", result); //line:conc:psumlocal:check2
 
     exit(0);
 }
@@ -62,8 +62,8 @@ void *sum_local(void *vargp)
     long i, sum = 0;
 
     for (i = start; i < end; i++) {        //line:conc:psumlocal:threadsumloop1
-	sum += i;                          //line:conc:psumlocal:threadsumloop2 
-    }	                                   //line:conc:psumlocal:threadsumloop3
+    sum += i;                          //line:conc:psumlocal:threadsumloop2 
+    }                                       //line:conc:psumlocal:threadsumloop3
     psum[myid] = sum; //line:conc:psumlocal:
     return NULL;
 }

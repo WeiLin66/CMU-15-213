@@ -20,8 +20,8 @@ int main(int argc, char **argv)
 
     /* Get input arguments */
     if (argc != 3) { 
-	printf("Usage: %s <nthreads> <log_nelems>\n", argv[0]);
-	exit(0);
+    printf("Usage: %s <nthreads> <log_nelems>\n", argv[0]);
+    exit(0);
     }
     nthreads = atoi(argv[1]);
     log_nelems = atoi(argv[2]);
@@ -29,8 +29,8 @@ int main(int argc, char **argv)
     /* $end psummutex */
     /* Check input arguments */
     if  ((nelems % nthreads) != 0 || (log_nelems > 31)) {
-	printf("Error: invalid nelems\n");
-	exit(0);
+    printf("Error: invalid nelems\n");
+    exit(0);
     }
     /* $begin psummutex */
     nelems_per_thread = nelems / nthreads;
@@ -38,15 +38,15 @@ int main(int argc, char **argv)
 
     /* Create peer threads and wait for them to finish */
     for (i = 0; i < nthreads; i++) {                  //line:conc:psummutex:createloop1
-	myid[i] = i;                                  //line:conc:psummutex:createloop2
-	Pthread_create(&tid[i], NULL, sum_mutex, &myid[i]); //line:conc:psummutex:createloop3
+    myid[i] = i;                                  //line:conc:psummutex:createloop2
+    Pthread_create(&tid[i], NULL, sum_mutex, &myid[i]); //line:conc:psummutex:createloop3
     }                                                 //line:conc:psummutex:createloop4
     for (i = 0; i < nthreads; i++)                    //line:conc:psummutex:waitloop1
-	Pthread_join(tid[i], NULL);                   //line:conc:psummutex:waitloop2
+    Pthread_join(tid[i], NULL);                   //line:conc:psummutex:waitloop2
     
     /* Check final answer */
     if (gsum != (nelems * (nelems-1))/2)     //line:conc:psummutex:check1
-	printf("Error: result=%ld\n", gsum); //line:conc:psummutex:check2
+    printf("Error: result=%ld\n", gsum); //line:conc:psummutex:check2
 
     exit(0);
 }
@@ -63,9 +63,9 @@ void *sum_mutex(void *vargp)
 
     for (i = start; i < end; i++) {        //line:conc:psummutex:threadsumloop1
         P(&mutex);                     //line:conc:psummutex:lock
-	gsum += i;                     //line:conc:psummutex:threadsumloop2 
+    gsum += i;                     //line:conc:psummutex:threadsumloop2 
         V(&mutex);                     //line:conc:psummutex:unlock
-    }	                               //line:conc:psummutex:threadsumloop3
+    }                                   //line:conc:psummutex:threadsumloop3
     return NULL;
 }
 /* $end psummutexthread */

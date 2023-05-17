@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "wait.h": "c",
-        "features.h": "c"
+        "features.h": "c",
+        "inet.h": "c"
     }
 }

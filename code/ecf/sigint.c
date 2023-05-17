@@ -11,7 +11,7 @@ int main()
 {
     /* Install the SIGINT handler */         
     if (signal(SIGINT, sigint_handler) == SIG_ERR)  //line:ecf:sigint:begininstall
-	unix_error("signal error");                 //line:ecf:sigint:endinstall
+    unix_error("signal error");                 //line:ecf:sigint:endinstall
     
     pause(); /* Wait for the receipt of a signal */  //line:ecf:sigint:pause
     

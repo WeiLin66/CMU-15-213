@@ -8,9 +8,9 @@ int main()
     char buf[MAXLINE];
 
     if (tfgets(buf, MAXLINE, stdin) == NULL)
-	printf("BOOM!\n");
+    printf("BOOM!\n");
     else 
-	printf("%s", buf);
+    printf("%s", buf);
 
     exit(0);
 }

@@ -10,8 +10,8 @@ int main()
     int i;  
     pthread_t tid;
     char *msgs[N] = {
-	"Hello from foo",  
-	"Hello from bar"   
+    "Hello from foo",  
+    "Hello from bar"   
     };
 
     ptr = msgs; 

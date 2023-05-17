@@ -10,7 +10,7 @@
  * Example (Assume a.out calls malloc and free):
  *   linux> gcc -Wall -DRUNTIME -shared -fpic -o mymalloc.so mymalloc.c -ldl
  *
- *   bash> (LD_PRELOAD="./mymalloc.so" ./a.out)	
+ *   bash> (LD_PRELOAD="./mymalloc.so" ./a.out)    
  *   ...or 
  *   tcsh> (setenv LD_PRELOAD "./mymalloc.so"; ./a.out; unsetenv LD_PRELOAD)
  */

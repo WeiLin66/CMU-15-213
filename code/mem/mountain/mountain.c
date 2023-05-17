@@ -35,24 +35,24 @@ int main()
 
     printf("\t");
     for (stride = 1; stride <= MAXSTRIDE; stride++)
-	printf("s%d\t", stride);
+    printf("s%d\t", stride);
     printf("\n");
 
  /* $begin mountainmain */
     for (size = MAXBYTES; size >= MINBYTES; size >>= 1) {
 /* $end mountainmain */
-	/* Not shown in the text */
-	if (size > (1 << 20))
-	    printf("%dm\t", size / (1 << 20));
-	else
-	    printf("%dk\t", size / 1024);
+    /* Not shown in the text */
+    if (size > (1 << 20))
+        printf("%dm\t", size / (1 << 20));
+    else
+        printf("%dk\t", size / 1024);
 
 /* $begin mountainmain */
-	for (stride = 1; stride <= MAXSTRIDE; stride++) {
-	    printf("%.0f\t", run(size, stride, Mhz));
-	    
-	}
-	printf("\n");
+    for (stride = 1; stride <= MAXSTRIDE; stride++) {
+        printf("%.0f\t", run(size, stride, Mhz));
+        
+    }
+    printf("\n");
     }
     exit(0);
 }
@@ -64,7 +64,7 @@ void init_data(long *data, int n)
     int i;
 
     for (i = 0; i < n; i++)
-	data[i] = i;
+    data[i] = i;
 }
 
 /* $begin mountainfuns */
@@ -80,15 +80,15 @@ int test(int elems, int stride)
 
     /* Combine 4 elements at a time */
     for (i = 0; i < limit; i += sx4) {
-	acc0 = acc0 + data[i];     
+    acc0 = acc0 + data[i];     
         acc1 = acc1 + data[i+stride];
-	acc2 = acc2 + data[i+sx2]; 
+    acc2 = acc2 + data[i+sx2]; 
         acc3 = acc3 + data[i+sx3];
     }
 
     /* Finish any remaining elements */
     for (; i < length; i += stride) {
-	acc0 = acc0 + data[i];
+    acc0 = acc0 + data[i];
     }
     return ((acc0 + acc1) + (acc2 + acc3));
 }
