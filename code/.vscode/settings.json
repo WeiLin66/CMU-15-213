@@ -8,6 +8,7 @@
         "csapp.h": "c",
         "stat.h": "c",
         "unistd.h": "c",
-        "cstdio": "c"
+        "cstdio": "c",
+        "signal.h": "c"
     }
 }
