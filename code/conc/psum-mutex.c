@@ -14,6 +14,7 @@ long nelems_per_thread;  /* Number of elements to sum */
 sem_t mutex;             /* Mutex to protect global sum */
 
 int main(int argc, char **argv) {
+    
     long i, nelems, log_nelems, nthreads, myid[MAXTHREADS];
     pthread_t tid[MAXTHREADS];
 

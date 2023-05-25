@@ -9,6 +9,8 @@
         "stat.h": "c",
         "unistd.h": "c",
         "cstdio": "c",
-        "signal.h": "c"
+        "signal.h": "c",
+        "type_traits": "c",
+        "sbuf.h": "c"
     }
 }

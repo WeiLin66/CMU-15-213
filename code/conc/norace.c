@@ -7,8 +7,8 @@
 
 void *thread(void *vargp);
 
-int main() 
-{
+int main() {
+    
     pthread_t tid[N];
     int i, *ptr;
 
@@ -23,8 +23,7 @@ int main()
 }
 
 /* Thread routine */
-void *thread(void *vargp) 
-{
+void *thread(void *vargp) {
     int myid = *((int *)vargp); //line:conc:norace:assign
     Free(vargp); 
     printf("Hello from thread %d\n", myid);

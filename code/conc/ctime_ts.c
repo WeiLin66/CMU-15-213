@@ -6,14 +6,14 @@
 
 static sem_t mutex; /* protects calls to ctime */
 
-static void init_ctime_ts(void)
-{
+static void init_ctime_ts(void) {
+
     Sem_init(&mutex, 0, 1);
 }
 
 /* $begin ctime_ts */
-char *ctime_ts(const time_t *timep, char *privatep)
-{
+char *ctime_ts(const time_t *timep, char *privatep) {
+
     char *sharedp; 
 
     P(&mutex);
@@ -24,8 +24,8 @@ char *ctime_ts(const time_t *timep, char *privatep)
 }
 /* $end ctime_ts */
 
-int main()
-{
+int main() {
+    
     char timestr[MAXSTR];
     time_t timeval;
 
