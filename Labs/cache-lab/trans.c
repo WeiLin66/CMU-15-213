@@ -10,7 +10,12 @@
 #include <stdio.h>
 #include "cachelab.h"
 
+#define TRANS(M,N,A,B)  trans6167(M,N,A,B);
+
 int is_transpose(int M, int N, int A[N][M], int B[M][N]);
+void trans32(int M, int N, int A[N][M], int B[M][N]);
+void trans64(int M, int N, int A[N][M], int B[M][N]);
+void trans6167(int M, int N, int A[N][M], int B[M][N]);
 
 /* 
  * transpose_submit - This is the solution transpose function that you
@@ -22,35 +27,7 @@ int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N]){
 
-    int i, j, i1;
-
-    for (i = 0; i < N; i += 8) {
-
-        for (j = 0; j < M; j += 8) {
-            
-            /* B * B mini block */
-            for(i1=i; i1<i+8; i1++) {
-
-                int temp_0 = A[i1][j];
-                int temp_1 = A[i1][j+1];
-                int temp_2 = A[i1][j+2];
-                int temp_3 = A[i1][j+3];
-                int temp_4 = A[i1][j+4];
-                int temp_5 = A[i1][j+5];
-                int temp_6 = A[i1][j+6];
-                int temp_7 = A[i1][j+7];
-
-                B[j][i1] = temp_0;
-                B[j+1][i1] = temp_1;
-                B[j+2][i1] = temp_2;
-                B[j+3][i1] = temp_3;
-                B[j+4][i1] = temp_4;
-                B[j+5][i1] = temp_5;
-                B[j+6][i1] = temp_6;
-                B[j+7][i1] = temp_7;
-            }
-        }
-    }   
+    TRANS(M,N,A,B);  
 }
 
 /* 
