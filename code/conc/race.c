@@ -9,6 +9,7 @@
 void *thread(void *vargp);
 
 int main() {
+    
     pthread_t tid[N];
     int i;
 

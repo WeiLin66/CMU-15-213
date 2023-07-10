@@ -11,6 +11,7 @@
         "cstdio": "c",
         "signal.h": "c",
         "type_traits": "c",
-        "sbuf.h": "c"
+        "sbuf.h": "c",
+        "pthread.h": "c"
     }
 }

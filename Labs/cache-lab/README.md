@@ -534,9 +534,9 @@ void trans32(int M, int N, int A[N][M], int B[M][N]){
     int i, j, i1;
 	
     /* 循環遍歷每個塊 */
-    for (i = 0; i < M; i += 8) {
+    for (i = 0; i < N; i += 8) {
 
-        for (j = 0; j < N; j += 8) {
+        for (j = 0; j < M; j += 8) {
             
             /* 對每個小塊進行數據轉移處理 */
             for(i1=i; i1<i+8; i1++) {
