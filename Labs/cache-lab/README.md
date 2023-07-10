@@ -737,6 +737,20 @@ void trans6167(int M, int N, int A[N][M], int B[M][N]){
 }
 ```
 
+### 總結
+
+Blocking 技巧主要用來優化對於兩維陣列的訪問，主要是利用了 CPU Cache 的空間局部性和時間局部性。合理的使用 blocking 技巧可以將一部分數據預先加載進 cache，進而減少訪問主記憶體的次數，進一步提高程序的性能。
+
+根據假設的 cache設計：直接相連，共有 32 組，每組包含一個 cache line，每個 cache line 存放 32 bytes 資料，我們來看看適合使用 blocking 的矩陣大小。
+
+既然每個 cache line 可以存放 32 bytes 的資料，假設一個整數為 4 bytes，那麼每個 cache line 可以存放 8 個整數。考慮到矩陣的行列連續性，我們希望每次讀取一個 cache line 能夠最大化利用裡面的數據，所以理想的 block size 應該是 8x8。
+
+然而，適合的矩陣大小並不只取決於 cache line 的大小。還需要考慮到矩陣的總大小，是否能夠整除 block size，以及矩陣的存儲方式（row-major 或 column-major）。矩陣的大小應該是 block size 的整數倍，以便能夠完全劃分為若干個 block，以最大化利用 cache。
+
+綜合以上因素，對於這種 cache 設計，大小為 8n x 8n (n為正整數) 的矩陣可能會是最適合使用 blocking 的，這種情況下，blocking 可以最大程度地利用 cache，減少 cache miss，從而提高程序的性能。
+
+然而，請注意，這只是一種理想的情況，實際情況可能因為硬體結構，程序的其他部分以及具體的應用情況等多種因素而有所不同。因此，為了確定最優的矩陣大小和 block size，最好進行實際的測試和調試。
+
 ## 資源
 
 https://github.com/WeiLin66/CMU-15-213/tree/main/Labs/cache-lab
